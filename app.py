@@ -1,18 +1,19 @@
-# app.py
-# run with: streamlit run app.py
-
 import streamlit as st
-import plotly.graph_objects as go
-import plotly.express as px
-import pandas as pd
-from chatbot import ask, PROVIDERS, LLM_MODELS, DEFAULT_LLM_MODEL, DEFAULT_PROVIDER, save_chat_history, load_chat_history
-from models import load_all
 
 st.set_page_config(
     page_title="NK Proteins CMD CoPilot",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# app.py
+# run with: streamlit run app.py
+
+import plotly.graph_objects as go
+import plotly.express as px
+import pandas as pd
+from chatbot import ask, PROVIDERS, LLM_MODELS, DEFAULT_LLM_MODEL, DEFAULT_PROVIDER, save_chat_history, load_chat_history
+from models import load_all
 
 # --- MAIN APP LOGIC ------------------------------------------------------
 
