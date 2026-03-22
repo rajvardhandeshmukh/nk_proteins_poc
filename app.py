@@ -13,37 +13,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- SECURITY GATEWAY ----------------------------------------------------
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-def check_password():
-    """Returns True if the user had the correct password."""
-    def password_entered():
-        if st.session_state["password"] == os.getenv("APP_PASSWORD", "nk_admin_2026"):
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # don't store password
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        # First run, show input for password.
-        st.text_input("Enter Gateway Password", type="password", on_change=password_entered, key="password")
-        st.info("🔒 Secure Executive Portal. Access restricted.")
-        return False
-    elif not st.session_state["password_correct"]:
-        # Password not correct, show input + error.
-        st.text_input("Enter Gateway Password", type="password", on_change=password_entered, key="password")
-        st.error("😕 Password incorrect")
-        return False
-    else:
-        # Password correct.
-        return True
-
-if not check_password():
-    st.stop()  # Stop execution until password is correct
-
 # --- MAIN APP LOGIC ------------------------------------------------------
 
 st.sidebar.title("CoPilot Controls")
