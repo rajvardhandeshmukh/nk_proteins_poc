@@ -131,7 +131,7 @@ if show_dashboard:
         st.markdown("**8. Inventory optimization: Capital Locked**")
         ice_df = pd.DataFrame(d['inventory']['top_dead_skus'])
         if not ice_df.empty:
-            fig5 = px.bar(ice_df, x='sku', y='capital_locked', color_discrete_sequence=['#FFC107'])
+            fig5 = px.bar(ice_df, x='sku', y='total_value_inr', color_discrete_sequence=['#FFC107'])
             fig5.update_layout(height=250, margin=dict(l=0,r=0,t=10,b=0))
             st.plotly_chart(fig5, use_container_width=True)
 
