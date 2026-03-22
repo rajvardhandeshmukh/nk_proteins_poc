@@ -1,0 +1,16 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.db
+.DS_Store
+.env
+.venv
+venv
+env
+/logs
+cached_model_output.json
+node_modules
+.gemini
