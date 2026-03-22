@@ -10,7 +10,8 @@ from models import load_all
 
 st.set_page_config(
     page_title="NK Proteins CMD CoPilot",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # --- MAIN APP LOGIC ------------------------------------------------------
