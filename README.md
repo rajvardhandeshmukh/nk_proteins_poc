@@ -54,6 +54,15 @@ AI_PROVIDER_ORCHESTRATION_API_KEY="your_api_key"
 streamlit run app.py
 ```
 
+## Troubleshooting: Prophet/Stan Backend Error
+If you see an error related to "Stan backend" or "Prophet installation" on Windows:
+1.  **Ensure you have a C++ compiler** installed (e.g., Mingw-w64 via MSYS2).
+2.  **Manually install cmdstan**:
+    ```powershell
+    python -c "import cmdstanpy; cmdstanpy.install_cmdstan()"
+    ```
+3.  **Fallback Mode:** The application is designed to automatically detect if Prophet is broken and will fall back to a robust XGBoost-only forecast to ensure the dashboard remains functional.
+
 ## Usage
 
 - **Dashboard:** View high-level metrics across Sales, Operations, and Finance in the main grid.
