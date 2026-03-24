@@ -91,11 +91,11 @@ def build_system_prompt(data, user_query=""):
     # 2. Determine which pillars are relevant to the query to save CPU tokens
     q = user_query.lower()
     active_pillars = {
-        "sales": any(x in q for x in ["sale", "forecast", "revenue", "product", "trend"]),
-        "cashflow": any(x in q for x in ["cash", "overdue", "payer", "dso", "payment", "money"]),
-        "inventory": any(x in q for x in ["inventory", "stock", "sku", "warehouse", "dead"]),
-        "gst": any(x in q for x in ["gst", "tax", "itc", "mismatch", "supplier"]),
-        "profitability": any(x in q for x in ["profit", "margin", "promote", "discontinue", "customer"])
+        "sales": any(x in q for x in ["sale", "forecast", "revenue", "product", "trend", "grow", "top"]),
+        "cashflow": any(x in q for x in ["cash", "overdue", "pay", "dso", "money", "slow", "due", "risk"]),
+        "inventory": any(x in q for x in ["inventory", "stock", "sku", "warehouse", "dead", "reorder"]),
+        "gst": any(x in q for x in ["gst", "tax", "itc", "mismatch", "supplier", "risk"]),
+        "profitability": any(x in q for x in ["profit", "margin", "promote", "discontinue", "customer", "segment", "top"])
     }
     
     # NEW LOGIC: Only default to 'Everything' if NO specific pillars were detected
