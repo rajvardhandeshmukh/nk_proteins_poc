@@ -172,7 +172,7 @@ def call_ollama_local(user_prompt, system_prompt, model_name):
             ],
             "stream": False
         }
-        response = requests.post(url, json=payload, timeout=60)
+        response = requests.post(url, json=payload, timeout=180) # Increased to 180s for local loading
         response.raise_for_status()
         return response.json().get('message', {}).get('content', "Error: No response from Ollama")
     except Exception as e:
