@@ -64,7 +64,7 @@ LLM_MODELS = [
   {"provider": "claude", "label": "Claude 3 Haiku", "value": "claude-3-haiku-20240307"},
   {"provider": "ollama", "label": "Qwen 3 VL 4B", "value": "qwen3-vl:4b"},
   {"provider": "ollama", "label": "Phi-4 Mini", "value": "phi4-mini:latest"},
-  {"provider": "ollama", "label": "Llama 3.1", "value": "llama3.1"},
+  {"provider": "ollama", "label": "Llama 3.2 3B", "value": "llama3.2:3b"},
 ]
 
 DEFAULT_LLM_MODEL = "gpt-4o"
@@ -161,7 +161,9 @@ def call_ai_provider_orchestration(user_prompt, system_prompt, model_name=DEFAUL
         return {"error": str(e)}
 
 def call_ollama_local(user_prompt, system_prompt, model_name):
-    """Calls local Ollama API."""
+    """Calls local Ollama API with performance monitoring."""
+    import time
+    start_time = time.time()
     try:
         url = "http://localhost:11434/api/chat"
         payload = {
@@ -172,11 +174,21 @@ def call_ollama_local(user_prompt, system_prompt, model_name):
             ],
             "stream": False
         }
-        response = requests.post(url, json=payload, timeout=180) # Increased to 180s for local loading
+        response = requests.post(url, json=payload, timeout=180)
         response.raise_for_status()
-        return response.json().get('message', {}).get('content', "Error: No response from Ollama")
+        
+        duration = round(time.time() - start_time, 2)
+        content = response.json().get('message', {}).get('content', "Error: No response from Ollama")
+        
+        # Log performance metrics
+        log_interaction(payload, {"duration_sec": duration, "model": model_name}, error=None)
+        
+        # Prepend the duration to the response for the user to see
+        return f"*(Processed locally by {model_name} in {duration}s)*\n\n{content}"
     except Exception as e:
-        return f"Error connecting to Ollama: {str(e)}. (Is Ollama running?)"
+        duration = round(time.time() - start_time, 2)
+        log_interaction(payload, None, error=f"Timeout/Error after {duration}s: {str(e)}")
+        return f"Error connecting to Ollama: {str(e)}. (Is Ollama running? Attempt took {duration}s)"
 
 def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_PROVIDER):
     """
