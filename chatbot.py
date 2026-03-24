@@ -88,6 +88,20 @@ def build_system_prompt(data, user_query=""):
         recent_keys = sorted(hist.keys())[-12:] # 12 months is the 'Goldilocks' zone
         data['sales']['historical_monthly_revenue'] = {k: hist[k] for k in recent_keys}
 
+    # 2. Determine which pillars are relevant to the query to save CPU tokens
+    q = user_query.lower()
+    active_pillars = {
+        "sales": any(x in q for x in ["sale", "forecast", "revenue", "product", "trend"]),
+        "cashflow": any(x in q for x in ["cash", "overdue", "payer", "dso", "payment", "money"]),
+        "inventory": any(x in q for x in ["inventory", "stock", "sku", "warehouse", "dead"]),
+        "gst": any(x in q for x in ["gst", "tax", "itc", "mismatch", "supplier"]),
+        "profitability": any(x in q for x in ["profit", "margin", "promote", "discontinue", "customer"])
+    }
+    
+    # Default to all pillars if it's a general summary/report request or no keywords match
+    if not any(active_pillars.values()) or "summar" in q or "report" in q:
+        active_pillars = {k: True for k in active_pillars}
+
     prompt = """You are the 'NK Proteins AI CoPilot', a senior executive-level business analyst.
 Your goal is to provide 'Brutally Honest', actionable insights based ONLY on the provided JSON data.
 
@@ -100,8 +114,7 @@ STRICT INSTRUCTIONS:
 
 === REAL-TIME BUSINESS DATA ===
 """
-    # Standard Pillar Structure (Always present)
-    pillars = ["sales", "cashflow", "inventory", "gst", "profitability"]
+    # Standard Pillar Structure (Inject only relevant segments)
     headers = {
         "sales": "SALES FORECAST & TRENDS",
         "cashflow": "CASH FLOW & AR RISK",
@@ -110,8 +123,8 @@ STRICT INSTRUCTIONS:
         "profitability": "PROFITABILITY & SEGMENTATION"
     }
 
-    for p in pillars:
-        if p in data:
+    for p, is_active in active_pillars.items():
+        if is_active and p in data:
             prompt += f"\n════════ {headers[p]} ════════\n"
             prompt += json.dumps(data[p], indent=2, cls=DateTimeEncoder) + "\n"
 
