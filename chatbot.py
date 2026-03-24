@@ -98,8 +98,9 @@ def build_system_prompt(data, user_query=""):
         "profitability": any(x in q for x in ["profit", "margin", "promote", "discontinue", "customer"])
     }
     
-    # Default to all pillars if it's a general summary/report request or no keywords match
-    if not any(active_pillars.values()) or "summar" in q or "report" in q:
+    # NEW LOGIC: Only default to 'Everything' if NO specific pillars were detected
+    found_any = any(active_pillars.values())
+    if not found_any and ("summar" in q or "report" in q or not q):
         active_pillars = {k: True for k in active_pillars}
 
     prompt = """You are the 'NK Proteins AI CoPilot', a senior executive-level business analyst.
