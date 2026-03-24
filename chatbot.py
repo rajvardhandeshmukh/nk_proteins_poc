@@ -77,91 +77,43 @@ class DateTimeEncoder(json.JSONEncoder):
             return obj.strftime('%Y-%m-%d')
         return super().default(obj)
 
-def build_system_prompt(data, user_query="", is_local=False):
+def build_system_prompt(data, user_query=""):
     """
-    Hybrid Prompt Engine: 
-    - Cloud (OpenAI/Claude/Google): Full detailed executive reasoning.
-    - Local (Ollama): Ultra-lightweight, aggressive context pruning for i3 CPUs.
+    Unified AI Prompt Architecture for NK Protein CoPilot.
+    Balanced for high-performance reasoning (Cloud) and efficiency (Local).
     """
-    q = user_query.lower()
-    
-    # 1. Determine which pillars are relevant
-    pillars = {
-        "sales": any(x in q for x in ["sale", "forecast", "revenue", "trend", "product", "growth"]),
-        "cashflow": any(x in q for x in ["cash", "overdue", "inflow", "payer", "dso", "payment", "money"]),
-        "inventory": any(x in q for x in ["inventory", "stock", "sku", "warehouse", "dead", "reorder"]),
-        "gst": any(x in q for x in ["gst", "tax", "itc", "mismatch", "supplier", "risk"]),
-        "profitability": any(x in q for x in ["profit", "margin", "promote", "discontinue", "customer", "segment"])
+    # 1. Standardize History (Unified 12-month lookback for balance)
+    if 'sales' in data and 'historical_monthly_revenue' in data['sales']:
+        hist = data['sales']['historical_monthly_revenue']
+        recent_keys = sorted(hist.keys())[-12:] # 12 months is the 'Goldilocks' zone
+        data['sales']['historical_monthly_revenue'] = {k: hist[k] for k in recent_keys}
+
+    prompt = """You are the 'NK Proteins AI CoPilot', a senior executive-level business analyst.
+Your goal is to provide 'Brutally Honest', actionable insights based ONLY on the provided JSON data.
+
+STRICT INSTRUCTIONS:
+1. DATA INTEGRITY: Use exact numbers from the JSON. Never hallucinate.
+2. STRUCTURE: Use Markdown Tables for any list exceeding 3 items.
+3. PERSONALITY: Be direct, professional, and highlight risks immediately.
+4. ACTION: Always end with: "Action: [Exactly one thing the executive should do today]"
+5. LIMIT: Keep responses under 8 lines unless a 'Full Report' is requested.
+
+=== REAL-TIME BUSINESS DATA ===
+"""
+    # Standard Pillar Structure (Always present)
+    pillars = ["sales", "cashflow", "inventory", "gst", "profitability"]
+    headers = {
+        "sales": "SALES FORECAST & TRENDS",
+        "cashflow": "CASH FLOW & AR RISK",
+        "inventory": "INVENTORY OPTIMIZATION",
+        "gst": "GST & TAX COMPLIANCE",
+        "profitability": "PROFITABILITY & SEGMENTATION"
     }
-    
-    # If no specific pillar is mentioned, or it's a general/complex request, include everything
-    if not any(pillars.values()) or "summar" in q or "report" in q or "everything" in q:
-        pillars = {k: True for k in pillars}
 
-    # --- BRANCH A: LOCAL OLLAMA (PRUNED & SUMMARIZED HISTORY) ---
-    if is_local:
-        # Aggressive Pruning: Summarize history instead of sending all months
-        if 'sales' in data and 'historical_monthly_revenue' in data['sales']:
-            hist = data['sales']['historical_monthly_revenue']
-            # Calculate Yearly Averages
-            yearly_stats = {}
-            for year in ["2022", "2023", "2024"]:
-                vals = [v for k, v in hist.items() if year in k]
-                if vals:
-                    yearly_stats[f"{year}_AVG_MONTHLY"] = round(sum(vals) / len(vals), 0)
-            
-            # Keep only the last 3 months of raw data
-            recent_keys = sorted(hist.keys())[-3:]
-            recent_data = {k: hist[k] for k in recent_keys}
-            
-            # Swap the heavy dictionary for the summarized version
-            data['sales']['historical_summary_note'] = "Full history summarized into yearly averages for local CPU efficiency."
-            data['sales']['historical_averages'] = yearly_stats
-            data['sales']['recent_monthly_revenue'] = recent_data
-            del data['sales']['historical_monthly_revenue']
-
-        prompt = """You are a 'Brutally Honest' AI Business Analyst. 
-Use ONLY the data segments below. Be precise and concise (max 3 sentences).
-=== DATA ===
-"""
-        for p_name, active in pillars.items():
-            if active and p_name in data:
-                prompt += f"\n[{p_name.upper()} DATA]: " + json.dumps(data[p_name], cls=DateTimeEncoder) + "\n"
-        return prompt
-
-    # --- BRANCH B: CLOUD AI (FULL POWER & DETAILED) ---
-    prompt = f"""You are the 'NK Proteins AI CoPilot', a senior executive-level business analyst.
-Your goal is to provide 'Brutally Honest', actionable insights based on the mathematical models below.
-
-STRICT RULES:
-- If a number isn't in the data, do NOT hallucinate it.
-- Always provide a summary in a Markdown Table for lists of items.
-- Always end with: "Action: [One specific thing to do today based on this data]"
-- The system date is 2024-12-01.
-
-══════════════════════════════════════════════
-BUSINESS DATA REPOSITORY
-══════════════════════════════════════════════
-"""
-    if pillars["sales"]:
-        prompt += f"\n[SALES FORECAST - AI Confidence: {100.0 - data['sales'].get('xgboost_mape', 10.0)}%]\n"
-        prompt += json.dumps(data['sales'], indent=2, cls=DateTimeEncoder) + "\n"
-        
-    if pillars["cashflow"]:
-        prompt += f"\n[CASH FLOW & RECEIVABLES]\n"
-        prompt += json.dumps(data['cashflow'], indent=2, cls=DateTimeEncoder) + "\n"
-        
-    if pillars["inventory"]:
-        prompt += f"\n[INVENTORY OPTIMIZATION]\n"
-        prompt += json.dumps(data['inventory'], indent=2, cls=DateTimeEncoder) + "\n"
-        
-    if pillars["gst"]:
-        prompt += f"\n[GST RECONCILIATION]\n"
-        prompt += json.dumps(data['gst'], indent=2, cls=DateTimeEncoder) + "\n"
-        
-    if pillars["profitability"]:
-        prompt += f"\n[PROFITABILITY & SEGMENTATION]\n"
-        prompt += json.dumps(data['profitability'], indent=2, cls=DateTimeEncoder) + "\n"
+    for p in pillars:
+        if p in data:
+            prompt += f"\n════════ {headers[p]} ════════\n"
+            prompt += json.dumps(data[p], indent=2, cls=DateTimeEncoder) + "\n"
 
     return prompt
 
@@ -243,11 +195,7 @@ def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_
     q = question.lower()
     
     # --- PROMPT LOGIC ---
-    # Convert data to a mutable copy if local so we don't prune the actual cache for the UI
-    import copy
-    context_data = copy.deepcopy(data)
-    is_local = (provider == "ollama")
-    system_content = build_system_prompt(context_data, user_query=question, is_local=is_local)
+    system_content = build_system_prompt(data, user_query=question)
     user_content   = question
 
     # 1. IMMEDIATE HISTORICAL DATA OVERRIDE
