@@ -62,7 +62,7 @@ LLM_MODELS = [
   {"provider": "claude", "label": "Claude 3.5 Sonnet", "value": "claude-3-5-sonnet-20240620"},
   {"provider": "claude", "label": "Claude 3 Opus", "value": "claude-3-opus-20240229"},
   {"provider": "claude", "label": "Claude 3 Haiku", "value": "claude-3-haiku-20240307"},
-  {"provider": "ollama", "label": "Qwen 2.5 14B", "value": "qwen2.5:14b"},
+  {"provider": "ollama", "label": "Qwen 3 VL 4B", "value": "qwen3-vl:4b"},
   {"provider": "ollama", "label": "Phi-4 Mini", "value": "phi4-mini:latest"},
   {"provider": "ollama", "label": "Llama 3.1", "value": "llama3.1"},
 ]
