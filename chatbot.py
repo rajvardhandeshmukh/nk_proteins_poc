@@ -79,7 +79,9 @@ class DateTimeEncoder(json.JSONEncoder):
 
 def build_system_prompt(data, user_query="", is_local=False):
     """
-    Ultra-lightweight prompt builder optimized for local i3 CPUs.
+    Hybrid Prompt Engine: 
+    - Cloud (OpenAI/Claude/Google): Full detailed executive reasoning.
+    - Local (Ollama): Ultra-lightweight, aggressive context pruning for i3 CPUs.
     """
     q = user_query.lower()
     
@@ -92,34 +94,60 @@ def build_system_prompt(data, user_query="", is_local=False):
         "profitability": any(x in q for x in ["profit", "margin", "promote", "discontinue", "customer", "segment"])
     }
     
-    # If no specific pillar is mentioned, or it's a general question, include everything
+    # If no specific pillar is mentioned, or it's a general/complex request, include everything
     if not any(pillars.values()) or "summar" in q or "report" in q or "everything" in q:
         pillars = {k: True for k in pillars}
 
-    # 2. Aggressive Pruning for Local CPU
-    # If local, we limit history to save memory/processing
+    # --- BRANCH A: LOCAL OLLAMA (PRUNED & MINIMAL) ---
     if is_local:
         if 'sales' in data and 'historical_monthly_revenue' in data['sales']:
-            # Only send last 3 months of history instead of 48 months
             history = data['sales']['historical_monthly_revenue']
-            recent_keys = sorted(history.keys())[-3:]
+            recent_keys = sorted(history.keys())[-3:] # Only 3 months history
             data['sales']['historical_monthly_revenue'] = {k: history[k] for k in recent_keys}
-            data['sales']['TOP_HISTORICAL_NOTE'] = "History truncated to last 3 months to save local CPU memory."
 
-    prompt = """You are a 'Brutally Honest' AI Business Analyst. 
-Use ONLY the data below to provide a 2-sentence precise answer.
-
+        prompt = """You are a 'Brutally Honest' AI Business Analyst. 
+Use ONLY the data segments below. Be precise and concise (max 3 sentences).
 === DATA ===
 """
-    
-    for p_name, active in pillars.items():
-        if active and p_name in data:
-            prompt += f"\n[{p_name.upper()} DATA]: " + json.dumps(data[p_name], cls=DateTimeEncoder) + "\n"
+        for p_name, active in pillars.items():
+            if active and p_name in data:
+                prompt += f"\n[{p_name.upper()} DATA]: " + json.dumps(data[p_name], cls=DateTimeEncoder) + "\n"
+        return prompt
 
-    # Log prompt size for diagnostics
-    token_est = len(prompt) // 4
-    print(f" [DEBUG] Local Prompt Token Estimate: ~{token_est} tokens")
-    
+    # --- BRANCH B: CLOUD AI (FULL POWER & DETAILED) ---
+    prompt = f"""You are the 'NK Proteins AI CoPilot', a senior executive-level business analyst.
+Your goal is to provide 'Brutally Honest', actionable insights based on the mathematical models below.
+
+STRICT RULES:
+- If a number isn't in the data, do NOT hallucinate it.
+- Always provide a summary in a Markdown Table for lists of items.
+- Always end with: "Action: [One specific thing to do today based on this data]"
+- The system date is 2024-12-01.
+
+══════════════════════════════════════════════
+BUSINESS DATA REPOSITORY
+══════════════════════════════════════════════
+"""
+    if pillars["sales"]:
+        prompt += f"\n[SALES FORECAST - AI Confidence: {100.0 - data['sales'].get('xgboost_mape', 10.0)}%]\n"
+        prompt += json.dumps(data['sales'], indent=2, cls=DateTimeEncoder) + "\n"
+        
+    if pillars["cashflow"]:
+        prompt += f"\n[CASH FLOW & RECEIVABLES]\n"
+        prompt += json.dumps(data['cashflow'], indent=2, cls=DateTimeEncoder) + "\n"
+        
+    if pillars["inventory"]:
+        prompt += f"\n[INVENTORY OPTIMIZATION]\n"
+        prompt += json.dumps(data['inventory'], indent=2, cls=DateTimeEncoder) + "\n"
+        
+    if pillars["gst"]:
+        prompt += f"\n[GST RECONCILIATION]\n"
+        prompt += json.dumps(data['gst'], indent=2, cls=DateTimeEncoder) + "\n"
+        
+    if pillars["profitability"]:
+        prompt += f"\n[PROFITABILITY & SEGMENTATION]\n"
+        prompt += json.dumps(data['profitability'], indent=2, cls=DateTimeEncoder) + "\n"
+
     return prompt
 
 def call_ai_provider_orchestration(user_prompt, system_prompt, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_PROVIDER):
