@@ -98,9 +98,11 @@ def build_system_prompt(data, user_query=""):
         "profitability": any(x in q for x in ["profit", "margin", "promote", "discontinue", "customer", "segment", "top"])
     }
     
-    # NEW LOGIC: Only default to 'Everything' if NO specific pillars were detected
+    # 3. Handle 'Everything' Mode (Optimized for Local CPU)
     found_any = any(active_pillars.values())
-    if not found_any and ("summar" in q or "report" in q or not q):
+    is_general_summary = not found_any and ("summar" in q or "report" in q or "perform" in q or not q)
+    
+    if is_general_summary:
         active_pillars = {k: True for k in active_pillars}
 
     prompt = """You are the 'NK Proteins AI CoPilot', a senior executive-level business analyst.
@@ -111,11 +113,11 @@ STRICT INSTRUCTIONS:
 2. STRUCTURE: Use Markdown Tables for any list exceeding 3 items.
 3. PERSONALITY: Be direct, professional, and highlight risks immediately.
 4. ACTION: Always end with: "Action: [Exactly one thing the executive should do today]"
-5. LIMIT: Keep responses under 8 lines unless a 'Full Report' is requested.
+5. LIMIT: Keep responses under 8 lines.
 
 === REAL-TIME BUSINESS DATA ===
 """
-    # Standard Pillar Structure (Inject only relevant segments)
+    # Standard Pillar Structure
     headers = {
         "sales": "SALES FORECAST & TRENDS",
         "cashflow": "CASH FLOW & AR RISK",
@@ -124,10 +126,20 @@ STRICT INSTRUCTIONS:
         "profitability": "PROFITABILITY & SEGMENTATION"
     }
 
+    import copy
     for p, is_active in active_pillars.items():
         if is_active and p in data:
+            # OPTIMIZATION: If it's a general summary, strip the heavy lists to save i3 CPU
+            pillar_data = copy.deepcopy(data[p])
+            if is_general_summary:
+                # Remove common large lists
+                for heavy_key in ["top_5_products", "top_slow_payers", "top_dead_skus", "low_margin_customers", "historical_monthly_revenue"]:
+                    if heavy_key in pillar_data:
+                        del pillar_data[heavy_key]
+                pillar_data["_note"] = "Detailed lists removed for summary speed."
+
             prompt += f"\n════════ {headers[p]} ════════\n"
-            prompt += json.dumps(data[p], indent=2, cls=DateTimeEncoder) + "\n"
+            prompt += json.dumps(pillar_data, indent=2, cls=DateTimeEncoder) + "\n"
 
     return prompt
 
