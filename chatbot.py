@@ -98,15 +98,10 @@ def build_system_prompt(data, user_query="", is_local=False):
     if not any(pillars.values()) or "summar" in q or "report" in q or "everything" in q:
         pillars = {k: True for k in pillars}
 
-    # --- BRANCH A: LOCAL OLLAMA (PRUNED & MINIMAL) ---
+    # --- BRANCH A: LOCAL OLLAMA (PRUNED BUT FULL PILLAR DATA) ---
     if is_local:
-        if 'sales' in data and 'historical_monthly_revenue' in data['sales']:
-            history = data['sales']['historical_monthly_revenue']
-            recent_keys = sorted(history.keys())[-3:] # Only 3 months history
-            data['sales']['historical_monthly_revenue'] = {k: history[k] for k in recent_keys}
-
         prompt = """You are a 'Brutally Honest' AI Business Analyst. 
-Use ONLY the data segments below. Be precise and concise (max 3 sentences).
+Use ONLY the data segments below. Be precise and concise (max 4 sentences).
 === DATA ===
 """
         for p_name, active in pillars.items():
