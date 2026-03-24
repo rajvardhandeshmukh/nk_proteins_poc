@@ -77,10 +77,9 @@ class DateTimeEncoder(json.JSONEncoder):
             return obj.strftime('%Y-%m-%d')
         return super().default(obj)
 
-def build_system_prompt(data, user_query=""):
+def build_system_prompt(data, user_query="", is_local=False):
     """
-    Builds a dynamically pruned system prompt to save tokens and speed up local inference.
-    If a user_query is provided, it filters for relevant business pillars.
+    Ultra-lightweight prompt builder optimized for local i3 CPUs.
     """
     q = user_query.lower()
     
@@ -97,36 +96,30 @@ def build_system_prompt(data, user_query=""):
     if not any(pillars.values()) or "summar" in q or "report" in q or "everything" in q:
         pillars = {k: True for k in pillars}
 
-    # 2. Construct the prompt
-    prompt = """You are the 'NK Proteins AI CoPilot', a senior executive-level business analyst.
-Your goal is to provide 'Brutally Honest' insights based ONLY on the provided JSON data.
+    # 2. Aggressive Pruning for Local CPU
+    # If local, we limit history to save memory/processing
+    if is_local:
+        if 'sales' in data and 'historical_monthly_revenue' in data['sales']:
+            # Only send last 3 months of history instead of 48 months
+            history = data['sales']['historical_monthly_revenue']
+            recent_keys = sorted(history.keys())[-3:]
+            data['sales']['historical_monthly_revenue'] = {k: history[k] for k in recent_keys}
+            data['sales']['TOP_HISTORICAL_NOTE'] = "History truncated to last 3 months to save local CPU memory."
 
-CONSTRAINT: If a number isn't in the data, do NOT hallucinate it. If asked for advice, base it on the metrics provided.
+    prompt = """You are a 'Brutally Honest' AI Business Analyst. 
+Use ONLY the data below to provide a 2-sentence precise answer.
 
-=== CURRENT BUSINESS CONTEXT ===
+=== DATA ===
 """
     
-    if pillars["sales"]:
-        prompt += f"\nSALES FORECAST (AI Accuracy: {100.0 - data['sales'].get('xgboost_mape', 10.0)}%)\n"
-        prompt += json.dumps(data['sales'], indent=2, cls=DateTimeEncoder) + "\n"
-        
-    if pillars["cashflow"]:
-        prompt += f"\nCASH FLOW & AR RISK\n"
-        prompt += json.dumps(data['cashflow'], indent=2, cls=DateTimeEncoder) + "\n"
-        
-    if pillars["inventory"]:
-        prompt += f"\nINVENTORY OPTIMIZATION\n"
-        prompt += json.dumps(data['inventory'], indent=2, cls=DateTimeEncoder) + "\n"
-        
-    if pillars["gst"]:
-        prompt += f"\nGST & TAX COMPLIANCE\n"
-        prompt += json.dumps(data['gst'], indent=2, cls=DateTimeEncoder) + "\n"
-        
-    if pillars["profitability"]:
-        prompt += f"\nPROFITABILITY & SEGMENTATION\n"
-        prompt += json.dumps(data['profitability'], indent=2, cls=DateTimeEncoder) + "\n"
+    for p_name, active in pillars.items():
+        if active and p_name in data:
+            prompt += f"\n[{p_name.upper()} DATA]: " + json.dumps(data[p_name], cls=DateTimeEncoder) + "\n"
 
-    prompt += "\nINSTRUCTION: Provide a concise, 3-sentence executive summary based on the data above."
+    # Log prompt size for diagnostics
+    token_est = len(prompt) // 4
+    print(f" [DEBUG] Local Prompt Token Estimate: ~{token_est} tokens")
+    
     return prompt
 
 def call_ai_provider_orchestration(user_prompt, system_prompt, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_PROVIDER):
@@ -207,7 +200,11 @@ def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_
     q = question.lower()
     
     # --- PROMPT LOGIC ---
-    system_content = build_system_prompt(data, user_query=question)
+    # Convert data to a mutable copy if local so we don't prune the actual cache for the UI
+    import copy
+    context_data = copy.deepcopy(data)
+    is_local = (provider == "ollama")
+    system_content = build_system_prompt(context_data, user_query=question, is_local=is_local)
     user_content   = question
 
     # 1. IMMEDIATE HISTORICAL DATA OVERRIDE
