@@ -98,10 +98,30 @@ def build_system_prompt(data, user_query="", is_local=False):
     if not any(pillars.values()) or "summar" in q or "report" in q or "everything" in q:
         pillars = {k: True for k in pillars}
 
-    # --- BRANCH A: LOCAL OLLAMA (PRUNED BUT FULL PILLAR DATA) ---
+    # --- BRANCH A: LOCAL OLLAMA (PRUNED & SUMMARIZED HISTORY) ---
     if is_local:
+        # Aggressive Pruning: Summarize history instead of sending all months
+        if 'sales' in data and 'historical_monthly_revenue' in data['sales']:
+            hist = data['sales']['historical_monthly_revenue']
+            # Calculate Yearly Averages
+            yearly_stats = {}
+            for year in ["2022", "2023", "2024"]:
+                vals = [v for k, v in hist.items() if year in k]
+                if vals:
+                    yearly_stats[f"{year}_AVG_MONTHLY"] = round(sum(vals) / len(vals), 0)
+            
+            # Keep only the last 3 months of raw data
+            recent_keys = sorted(hist.keys())[-3:]
+            recent_data = {k: hist[k] for k in recent_keys}
+            
+            # Swap the heavy dictionary for the summarized version
+            data['sales']['historical_summary_note'] = "Full history summarized into yearly averages for local CPU efficiency."
+            data['sales']['historical_averages'] = yearly_stats
+            data['sales']['recent_monthly_revenue'] = recent_data
+            del data['sales']['historical_monthly_revenue']
+
         prompt = """You are a 'Brutally Honest' AI Business Analyst. 
-Use ONLY the data segments below. Be precise and concise (max 4 sentences).
+Use ONLY the data segments below. Be precise and concise (max 3 sentences).
 === DATA ===
 """
         for p_name, active in pillars.items():
