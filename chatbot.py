@@ -48,7 +48,8 @@ def load_chat_history(session_id="default"):
 PROVIDERS = [
   {"label": "OpenAI", "value": "openai"},
   {"label": "Google", "value": "google"},
-  {"label": "Claude", "value": "claude"}
+  {"label": "Claude", "value": "claude"},
+  {"label": "Ollama (Local)", "value": "ollama"}
 ]
 
 LLM_MODELS = [
@@ -61,6 +62,9 @@ LLM_MODELS = [
   {"provider": "claude", "label": "Claude 3.5 Sonnet", "value": "claude-3-5-sonnet-20240620"},
   {"provider": "claude", "label": "Claude 3 Opus", "value": "claude-3-opus-20240229"},
   {"provider": "claude", "label": "Claude 3 Haiku", "value": "claude-3-haiku-20240307"},
+  {"provider": "ollama", "label": "Qwen 2.5 14B", "value": "qwen2.5:14b"},
+  {"provider": "ollama", "label": "Phi-4 Mini", "value": "phi4-mini:latest"},
+  {"provider": "ollama", "label": "Llama 3.1", "value": "llama3.1"},
 ]
 
 DEFAULT_LLM_MODEL = "gpt-4o"
@@ -156,12 +160,34 @@ def call_ai_provider_orchestration(user_prompt, system_prompt, model_name=DEFAUL
         log_interaction(payload, None, error=str(e))
         return {"error": str(e)}
 
+def call_ollama_local(user_prompt, system_prompt, model_name):
+    """Calls local Ollama API."""
+    try:
+        url = "http://localhost:11434/api/chat"
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "stream": False
+        }
+        response = requests.post(url, json=payload, timeout=60)
+        response.raise_for_status()
+        return response.json().get('message', {}).get('content', "Error: No response from Ollama")
+    except Exception as e:
+        return f"Error connecting to Ollama: {str(e)}. (Is Ollama running?)"
+
 def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_PROVIDER):
     """
     Hybrid NLP layer: tries the real AI Orchestration API first, 
     falls back to hardcoded 'POC' logic if the API is unavailable.
     """
     q = question.lower()
+    
+    # --- PROMPT LOGIC ---
+    system_content = build_system_prompt(data)
+    user_content   = question
 
     # 1. IMMEDIATE HISTORICAL DATA OVERRIDE
     # (Checking for specific months/years first to ensure 'Brutally Honest' accuracy)
@@ -172,7 +198,7 @@ def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_
     if "202" in q: # Quick filter for year
         for m_name, m_num in months_map.items():
             if m_name in q:
-                for year in ["2022", "2023", "2024"]:
+                for year in ["2022", "2023", "2024", "2025", "2026"]: # Updated range
                     if year in q:
                         target_month = f"{year}-{m_num}"
                         break
@@ -183,11 +209,15 @@ def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_
         if val:
             return f"**AI Assistant:**\n For **{target_month}**, the total recorded revenue was **₹{int(val):,}**.\n\n**Action:** Compare this to the current month's performance in the 'Sales Forecast' panel."
         else:
-            return f"**AI Assistant:**\n I am sorry, but my records for NK Protein do not contain specific revenue data for **{target_month}**. My data spans from Jan 2022 to Dec 2024.\n\n**Action:** Please consult the SAP Archive for older financial records."
+            return f"**AI Assistant:**\n I am sorry, but my records for NK Protein do not contain specific revenue data for **{target_month}**.\n\n**Action:** Please consult the SAP Archive for older financial records."
 
-    # 2. Attempt Real AI Orchestration
-    system_prompt = {"role": "system", "content": build_system_prompt(data)}
-    user_prompt   = {"role": "user", "content": question}
+    # 2. LOCAL OLLAMA ROUTE
+    if provider == "ollama":
+        return call_ollama_local(user_content, system_content, model_name)
+
+    # 3. Attempt Real AI Orchestration (Cloud)
+    system_prompt = {"role": "system", "content": system_content}
+    user_prompt   = {"role": "user", "content": user_content}
     
     ai_response = call_ai_provider_orchestration(user_prompt, system_prompt, model_name, provider)
     
