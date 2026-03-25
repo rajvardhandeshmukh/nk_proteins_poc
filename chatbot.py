@@ -216,35 +216,36 @@ def call_ollama_local(user_prompt, system_prompt, model_name):
         return f"Error connecting to Ollama: {str(e)}. (Is Ollama running? Attempt took {duration}s)"
 
 def call_watsonx(user_prompt, system_prompt, model_id):
-    """Calls IBM Watsonx.ai API for Granite models."""
+    """Calls IBM Watsonx.ai API for Granite models using the standard SDK pattern."""
     try:
-        from ibm_watsonx_ai.foundation_models import Model
+        from ibm_watsonx_ai import Credentials
+        from ibm_watsonx_ai.foundation_models import ModelInference
         from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
-        from ibm_watsonx_ai.foundation_models.utils.enums import DecodingMethods
-        
-        credentials = {
-            "url": os.environ.get("WATSONX_URL", "https://us-south.ml.cloud.ibm.com"),
-            "apikey": os.environ.get("WATSONX_API_KEY")
-        }
+
+        credentials = Credentials(
+            url=os.environ.get("WATSONX_URL", "https://eu-de.ml.cloud.ibm.com"),
+            api_key=os.environ.get("WATSONX_API_KEY")
+        )
         project_id = os.environ.get("WATSONX_PROJECT_ID")
         
-        if not credentials["apikey"] or not project_id:
+        if not credentials.api_key or not project_id:
             return "Error: Missing WATSONX_API_KEY or WATSONX_PROJECT_ID in .env"
 
         params = {
-            GenParams.DECODING_METHOD: DecodingMethods.GREEDY,
+            GenParams.DECODING_METHOD: "greedy",
             GenParams.MIN_NEW_TOKENS: 1,
             GenParams.MAX_NEW_TOKENS: 1024,
-            GenParams.STOP_SEQUENCES: ["<|endoftext|>"]
+            GenParams.TEMPERATURE: 0.7
         }
 
-        model = Model(
+        model = ModelInference(
             model_id=model_id,
             params=params,
             credentials=credentials,
             project_id=project_id
         )
 
+        # IBM Granite Specific Prompt Formatting
         full_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{user_prompt}\n<|assistant|>\n"
         response = model.generate_text(prompt=full_prompt)
         
