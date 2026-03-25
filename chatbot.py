@@ -66,7 +66,10 @@ LLM_MODELS = [
   {"provider": "ollama", "label": "Qwen 3 VL 4B", "value": "qwen3-vl:4b"},
   {"provider": "ollama", "label": "Phi-4 Mini", "value": "phi4-mini:latest"},
   {"provider": "ollama", "label": "Llama 3.2 3B", "value": "llama3.2:3b"},
-  {"provider": "watsonx", "label": "Granite 3.3 8B Instruct", "value": "ibm/granite-3-3-8b-instruct"},
+  {"provider": "watsonx", "label": "Granite 3 8B Instruct", "value": "ibm/granite-3-8b-instruct"},
+  {"provider": "watsonx", "label": "Llama 3.3 70B Instruct", "value": "meta-llama/llama-3-3-70b-instruct"},
+  {"provider": "watsonx", "label": "Granite 4 H Small", "value": "ibm/granite-4-h-small"},
+  {"provider": "watsonx", "label": "Mistral Small 3.1 24B", "value": "mistralai/mistral-small-3-1-24b-instruct-2503"},
 ]
 
 DEFAULT_LLM_MODEL = "gpt-4o"
