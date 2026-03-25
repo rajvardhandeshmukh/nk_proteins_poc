@@ -49,7 +49,8 @@ PROVIDERS = [
   {"label": "OpenAI", "value": "openai"},
   {"label": "Google", "value": "google"},
   {"label": "Claude", "value": "claude"},
-  {"label": "Ollama (Local)", "value": "ollama"}
+  {"label": "Ollama (Local)", "value": "ollama"},
+  {"label": "IBM Watsonx", "value": "watsonx"}
 ]
 
 LLM_MODELS = [
@@ -65,6 +66,7 @@ LLM_MODELS = [
   {"provider": "ollama", "label": "Qwen 3 VL 4B", "value": "qwen3-vl:4b"},
   {"provider": "ollama", "label": "Phi-4 Mini", "value": "phi4-mini:latest"},
   {"provider": "ollama", "label": "Llama 3.2 3B", "value": "llama3.2:3b"},
+  {"provider": "watsonx", "label": "Granite 3.3 8B Instruct", "value": "ibm/granite-3-3-8b-instruct"},
 ]
 
 DEFAULT_LLM_MODEL = "gpt-4o"
@@ -213,6 +215,47 @@ def call_ollama_local(user_prompt, system_prompt, model_name):
         log_interaction(payload, None, error=f"Timeout/Error after {duration}s: {str(e)}")
         return f"Error connecting to Ollama: {str(e)}. (Is Ollama running? Attempt took {duration}s)"
 
+def call_watsonx(user_prompt, system_prompt, model_id):
+    """Calls IBM Watsonx.ai API for Granite models."""
+    try:
+        from ibm_watsonx_ai.foundation_models import Model
+        from ibm_watsonx_ai.metanames import GenTextParamsMetaNames as GenParams
+        from ibm_watsonx_ai.foundation_models.utils.enums import DecodingMethods
+        
+        credentials = {
+            "url": os.environ.get("WATSONX_URL", "https://us-south.ml.cloud.ibm.com"),
+            "apikey": os.environ.get("WATSONX_API_KEY")
+        }
+        project_id = os.environ.get("WATSONX_PROJECT_ID")
+        
+        if not credentials["apikey"] or not project_id:
+            return "Error: Missing WATSONX_API_KEY or WATSONX_PROJECT_ID in .env"
+
+        params = {
+            GenParams.DECODING_METHOD: DecodingMethods.GREEDY,
+            GenParams.MIN_NEW_TOKENS: 1,
+            GenParams.MAX_NEW_TOKENS: 1024,
+            GenParams.STOP_SEQUENCES: ["<|endoftext|>"]
+        }
+
+        model = Model(
+            model_id=model_id,
+            params=params,
+            credentials=credentials,
+            project_id=project_id
+        )
+
+        full_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{user_prompt}\n<|assistant|>\n"
+        response = model.generate_text(prompt=full_prompt)
+        
+        # Log interaction
+        log_interaction({"model": model_id, "prompt_len": len(full_prompt)}, {"response": response}, error=None)
+        
+        return response
+    except Exception as e:
+        log_interaction(None, None, error=str(e))
+        return f"Error connecting to Watsonx: {str(e)}"
+
 def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_PROVIDER):
     """
     Hybrid NLP layer: tries the real AI Orchestration API first, 
@@ -250,7 +293,11 @@ def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_
     if provider == "ollama":
         return call_ollama_local(user_content, system_content, model_name)
 
-    # 3. Attempt Real AI Orchestration (Cloud)
+    # 3. IBM WATSONX ROUTE
+    if provider == "watsonx":
+        return call_watsonx(user_content, system_content, model_name)
+
+    # 4. Attempt Real AI Orchestration (Cloud)
     system_prompt = {"role": "system", "content": system_content}
     user_prompt   = {"role": "user", "content": user_content}
     

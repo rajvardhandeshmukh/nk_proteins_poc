@@ -182,7 +182,15 @@ with message_container:
         with st.chat_message("user"):
             st.write(user_msg)
         with st.chat_message("assistant"):
-            st.write(bot_msg)
+            if "<think>" in bot_msg and "</think>" in bot_msg:
+                parts = bot_msg.split("</think>")
+                thought = parts[0].replace("<think>", "").strip()
+                response = parts[1].strip()
+                with st.expander("AI Reasoning Process"):
+                    st.write(thought)
+                st.write(response)
+            else:
+                st.write(bot_msg)
 
 user_input = st.chat_input("Ask your CoPilot anything about NK Protein's data...")
 question   = user_input or st.session_state.pop('pending', None)
@@ -194,6 +202,14 @@ if question:
         with st.chat_message("assistant"):
             with st.spinner("Analysing your data..."):
                 answer = ask(question, st.session_state.history, d, selected_model_value, selected_provider_value)
-            st.write(answer)
+            if "<think>" in answer and "</think>" in answer:
+                parts = answer.split("</think>")
+                thought = parts[0].replace("<think>", "").strip()
+                response = parts[1].strip()
+                with st.expander("AI Reasoning Process"):
+                    st.write(thought)
+                st.write(response)
+            else:
+                st.write(answer)
     st.session_state.history.append((question, answer))
     st.rerun()
