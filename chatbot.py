@@ -220,6 +220,8 @@ def call_ollama_local(user_prompt, system_prompt, model_name):
 
 def call_watsonx(user_prompt, system_prompt, model_id):
     """Calls IBM Watsonx.ai API for Granite models using the standard SDK pattern."""
+    import time
+    start_time = time.time()
     try:
         from ibm_watsonx_ai import Credentials
         from ibm_watsonx_ai.foundation_models import ModelInference
@@ -250,14 +252,31 @@ def call_watsonx(user_prompt, system_prompt, model_id):
 
         # IBM Granite Specific Prompt Formatting
         full_prompt = f"<|system|>\n{system_prompt}\n<|user|>\n{user_prompt}\n<|assistant|>\n"
-        response = model.generate_text(prompt=full_prompt)
-        
-        # Log interaction
-        log_interaction({"model": model_id, "prompt_len": len(full_prompt)}, {"response": response}, error=None)
-        
-        return response
+        raw_response = model.generate(prompt=full_prompt)
+        duration = round(time.time() - start_time, 2)
+
+        # Extract response text and IBM metadata
+        result = raw_response.get('results', [{}])[0]
+        response_text = result.get('generated_text', 'Error: No response from Watsonx')
+        input_tokens = result.get('input_token_count', 0)
+        output_tokens = result.get('generated_token_count', 0)
+        stop_reason = result.get('stop_reason', 'unknown')
+
+        # Enhanced logging with timing, tokens, and provider metadata
+        log_interaction(
+            {"provider": "watsonx", "model": model_id, "prompt_len": len(full_prompt), "project_id": project_id},
+            {"duration_sec": duration, "input_tokens": input_tokens, "output_tokens": output_tokens, "total_tokens": input_tokens + output_tokens, "stop_reason": stop_reason, "response_preview": response_text[:200]},
+            error=None
+        )
+
+        return response_text
     except Exception as e:
-        log_interaction(None, None, error=str(e))
+        duration = round(time.time() - start_time, 2)
+        log_interaction(
+            {"provider": "watsonx", "model": model_id},
+            None,
+            error=f"Timeout/Error after {duration}s: {str(e)}"
+        )
         return f"Error connecting to Watsonx: {str(e)}"
 
 def ask(question, history, data, model_name=DEFAULT_LLM_MODEL, provider=DEFAULT_PROVIDER):
