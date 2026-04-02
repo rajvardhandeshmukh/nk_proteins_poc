@@ -1,85 +1,74 @@
-# NK Protein AI Command Center
+# NK Protein Executive CoPilot (v6.0)
 
-An advanced, AI-powered SAP business intelligence dashboard designed for real-time manufacturing and supply chain analysis. This platform leverages XGBoost, Facebook Prophet, and Isolation Forest algorithms to provide actionable insights directly from SAP datasets.
+An institutional-grade, AI-powered Business Intelligence platform designed for real-time manufacturing and supply chain analysis. This system leverages advanced machine learning (XGBoost, Prophet, Isolation Forest) and a modular "Brain & Body" architecture to provide high-fidelity insights to the CMD.
 
-## Features
+## 🏛️ System Architecture (v6.0 Modular)
 
-- **Sales Forecasting:** Predictive revenue modeling using a hybrid XGBoost + Prophet engine.
-- **Cash Flow Analysis:** Real-time AR aging and DSO (Days Sales Outstanding) tracking.
-- **Inventory Optimization:** Automated dead-stock detection and reorder point (ROP) alerting.
-- **GST Reconciliation:** AI-driven anomaly detection (Isolation Forest) for Input Tax Credit (ITC) risk.
-- **Profitability Analysis:** Customer segmentation (K-Means) and unit economics monitoring.
-- **AI Chatbot:** A natural language interface to query business data and generate executive reports.
+The project is structured into three specialized packages for maximum maintainability and "Executive Monochrome" aesthetics:
 
-## Modular Architecture
+- **`interface/` (The Body):** Premium UI components, Plotly dashboards, and CSS design tokens.
+- **`brain/` (The Voice):** Multi-provider AI orchestration (OpenAI, Google, Claude, Ollama, Watsonx).
+- **`hub/` (The Reasoning Engine):** Intent classification, SQL generation, data governance, and ML routing.
+- **`models/` (The Analytics):** Domain-specific ML implementations (Sales, Cashflow, GST, Inventory, Profitability).
 
-The project is structured for high maintainability and scalability:
+## 🚀 Key Features
 
-- **/data:** Houses all raw SAP-exported CSV datasets.
-- **/models:** Contains independent, domain-specific AI modules:
-  - `sales.py`: Forecasting and trend analysis.
-  - `cashflow.py`: AR aging and collection probability.
-  - `inventory.py`: Stock health and capital-locked calculations.
-  - `gst.py`: Reconciliation and risk flagging.
-  - `profitability.py`: Clustering and margin analysis.
-  - `__init__.py`: Orchestrates the `load_all()` logic and result caching.
-- `app.py`: Streamlit-based executive dashboard.
-- `chatbot.py`: NLP routing and report generation engine.
+- **Executive Monochrome UI:** A sharp, minimal, high-contrast interface designed for rapid decision-making.
+- **Dual-Mode ML Pipelines:** Automated training (`train_pipeline.py`) with high-speed inference from cached models.
+- **Multi-Pillar AI Intelligence:** Parallel execution of all business domains (Sales, AR, GST, Inventory) in a single query.
+- **Model Health Monitoring:** Real-time MAPE tracking and accuracy badges in the sidebar.
+- **Confidence Gating:** Automated reliability checks (Emerald/Amber/Red) to ensure data integrity.
+- **Identity-Aware AI:** Multi-provider support including local, air-gapped LLMs (Ollama) for sensitive data.
 
-## Setup Instructions
+## 🛠️ Setup Instructions
 
-### 1. Prerequisites
-- Python 3.8 or higher installed on your system.
-- Access to a terminal (PowerShell, CMD, or Bash).
-
-### 2. Clone and Prepare Environment
+### 1. Prepare Environment
 ```powershell
-# Create and activate a virtual environment
 python -m venv venv
 .\venv\Scripts\activate
-
-# Install required dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment Variables
-Create a `.env` file in the root directory with the following keys:
+### 2. Configure Environment Variables
+Create a `.env` file in the root with:
 ```env
-AI_PROVIDER_ORCHESTRATION_API_URL="your_api_url"
-AI_PROVIDER_ORCHESTRATION_API_KEY="your_api_key"
+# AI Orchestration
+AI_PROVIDER_ORCHESTRATION_API_URL="your_url"
+AI_PROVIDER_ORCHESTRATION_API_KEY="your_key"
+
+# Database (MS SQL Server)
+MSSQL_PASS="your_password"
+
+# Optional: Enterprise Watsonx / Ollama
+WATSONX_API_KEY="your_key"
+WATSONX_PROJECT_ID="your_id"
 ```
 
-### 4. Run the Application
+### 3. Initialize Database & Models
+```powershell
+python db_setup.py         # Load raw CSVs into SQL Server
+python train_pipeline.py   # Run initial ML training
+```
+
+### 4. Launch CoPilot
 ```powershell
 streamlit run app.py
 ```
 
-## Troubleshooting: Prophet/Stan Backend Error
-If you see an error related to "Stan backend" or "Prophet installation" on Windows:
-1.  **Ensure you have a C++ compiler** installed (e.g., Mingw-w64 via MSYS2).
-2.  **Manually install cmdstan**:
-    ```powershell
-    python -c "import cmdstanpy; cmdstanpy.install_cmdstan()"
-    ```
-3.  **Fallback Mode:** The application is designed to automatically detect if Prophet is broken and will fall back to a robust XGBoost-only forecast to ensure the dashboard remains functional.
+## 📊 Analytics & ML Logic
 
-## Usage
+| Model | Algorithm | Purpose |
+|---|---|---|
+| **Sales** | XGBoost + Prophet | Multi-horizon revenue forecasting and trend detection. |
+| **Cashflow** | Probabilistic Aging | AR risk scoring and expected inflow calculation. |
+| **Compliance** | Isolation Forest | Anomaly detection in GST filings and ITC risk. |
+| **Inventory** | Threshold Analytics | Dead-stock detection and capital-locked analysis. |
+| **Segments** | KMeans Clustering | Customer value segmentation and margin profiling. |
 
-- **Dashboard:** View high-level metrics across Sales, Operations, and Finance in the main grid.
-- **Interactive Charts:** Hover over the Plotly visualizations to see specific data points and confidence intervals.
-- **Quick Questions:** Use the "Quick Question" buttons in the sidebar or main panel to trigger predefined NLP routes.
-- **Executive Reports:** Ask the chatbot to "Generate a full executive report" for a consolidated business health summary.
-
-## Data Security & Persistence
-- **Zero-Trust AI Logic:** The AI never sees raw SAP data; it only interprets high-level insights from local Python engines.
-- **Session Privacy:** Chat history is not persisted across sessions to ensure executive privacy. Refreshing the browser starts a clean session.
-- **Local Analysis:** All calculations are performed on-premise within the secure `/data` sandbox.
-
-## Deployment Options
-Though currently running locally, this POC is designed for easy cloud deployment:
-1. **Streamlit Cloud:** Direct integration with GitHub for instant hosting.
-2. **Dockerization:** Create a container for deployment on AWS ECS, GCP Cloud Run, or Azure App Service.
-3. **Enterprise VPC:** Host on-premise or within a private cloud using Nginx/Apache as a reverse proxy.
+## 🛡️ Governance & Security
+- **Data Sovereignty:** Local Python engines process all raw data; LLMs only receive sanitized summaries.
+- **Model Gating:** Forecasts with >25% MAPE are automatically suppressed to prevent "noisy" decision-making.
+- **Institutional Design:** No "AI slop" or emojis—designed for a professional boardroom environment.
 
 ---
 *Developed for NK Protein as an Executive Business Intelligence POC.*
