@@ -59,6 +59,8 @@ IMPORTANT DISTINCTION:
 - "biggest risks in cash flow" -> anomaly_detection (single domain)
 - "biggest risks across my business" -> multi_pillar (all domains)
 - "give me an executive summary" -> multi_pillar
+- "how have our sales trended" -> forecasting (global context)
+- "show me a sales report" -> aggregation (global context)
 
 Question: "{question}"
 
@@ -77,12 +79,14 @@ Question: "{question}"
 Reply with ONLY the domain name, nothing else."""
 
 ENTITY_EXTRACTION_PROMPT = """Extract the specific business entity being filtered from this question.
-Return ONLY the entity name, nothing else. If multiple entities, return the primary one.
+If the question is general (e.g., "how are sales trended?", "how is the business?"), return "NONE".
+Return ONLY the entity name or "NONE", nothing else.
 
 Question: "{question}"
 
 Examples:
 "How is the North doing?" → North
 "Is Cottonseed declining?" → Cottonseed
-"Compare Gujarat sales trends" → West
+"How have our sales trended?" → NONE
+"Market performance since 2022" → NONE
 "FreshMart Vadodara performance" → FreshMart Vadodara"""

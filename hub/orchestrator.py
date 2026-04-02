@@ -140,7 +140,43 @@ def ask_agentic(query, model_name, provider):
             "rows": total_rows, "raw_metrics": combined_ml
         }
 
-    # PATH B: FORECASTING / ANOMALY / SEGMENTATION
+    # ── PATH C: HYBRID (Entity-Specific Analysis) ──
+    if intent == 'hybrid':
+        raw_entity = call_llm_light(ENTITY_EXTRACTION_PROMPT.format(question=query), model_name, provider)
+        
+        # Guard: If no specific entity is found, fall back to global forecasting
+        if "NONE" in raw_entity.upper():
+            intent = 'forecasting'
+            # Fall through to Path B logic
+        else:
+            canonical, col, score = fuzzy_resolve_entity(raw_entity)
+            
+            # Guard: If score is very low, it's likely a general question misclassified as hybrid
+            if not col or score < 0.40:
+                print(f"[*] NLP: Resolving '{raw_entity}' as general query (Score: {score:.2f})")
+                intent = 'forecasting'
+                # Fall through to Path B logic
+            else:
+                # Proceed with entity-specific aggregation + forecast
+                base_sql = FULL_TABLE_QUERIES.get(pillar)
+                sql_query = text(base_sql.replace("WHERE ", f"WHERE {col} = :entity_val AND ", 1))
+                engine = get_mssql_engine()
+                with engine.connect() as conn:
+                    df = pd.read_sql(sql_query, conn, params={"entity_val": canonical})
+                
+                if df.empty: return build_zero_result_response(query, sql_query, intent)
+                
+                ml_result = run_ml_for_pillar(df, pillar, 'forecasting')
+                ml_result = apply_confidence_gate(ml_result)
+                final_narrative = narrate(ml_result, df, intent, pillar, query, model_name, provider)
+                log_pipeline_telemetry(query, intent, str(sql_query), len(df), time.time() - start_time, model_name)
+                
+                return {
+                    "narrative": final_narrative, "intent": intent, "sql": str(sql_query), "rows": len(df),
+                    "df_preview": get_smart_preview(df, pillar, intent), "raw_metrics": ml_result
+                }
+
+    # ── PATH B: FORECASTING / ANOMALY / SEGMENTATION (Global Domain Analysis) ──
     if intent in ('forecasting', 'anomaly_detection', 'segmentation'):
         sql_query = FULL_TABLE_QUERIES.get(pillar)
         engine = get_mssql_engine()
@@ -170,33 +206,6 @@ def ask_agentic(query, model_name, provider):
             "narrative": final_narrative, "intent": intent, "sql": sql_query, "rows": len(df), 
             "df_preview": get_smart_preview(df, pillar, intent), "raw_metrics": ml_result,
             "_confidence": ml_result.get('_confidence'), "_warnings": ml_result.get('_warnings')
-        }
-
-    # PATH C: HYBRID
-    if intent == 'hybrid':
-        raw_entity = call_llm_light(ENTITY_EXTRACTION_PROMPT.format(question=query), model_name, provider)
-        canonical, col, score = fuzzy_resolve_entity(raw_entity)
-        if not col:
-            return {"intent": "conversational", "narrative": f"**Not Found:** '{raw_entity}' (Score: {score:.2f})"}
-        
-        # SQL Injection Shield: Use Parameterized text()
-        base_sql = FULL_TABLE_QUERIES.get(pillar)
-        sql_query = text(base_sql.replace("WHERE ", f"WHERE {col} = :entity_val AND ", 1))
-        
-        engine = get_mssql_engine()
-        with engine.connect() as conn:
-            df = pd.read_sql(sql_query, conn, params={"entity_val": canonical})
-        
-        if df.empty: return build_zero_result_response(query, sql_query, intent)
-        
-        ml_result = run_ml_for_pillar(df, pillar, 'forecasting')
-        ml_result = apply_confidence_gate(ml_result)
-        final_narrative = narrate(ml_result, df, intent, pillar, query, model_name, provider)
-        log_pipeline_telemetry(query, intent, sql_query, len(df), time.time() - start_time, model_name)
-        
-        return {
-            "narrative": final_narrative, "intent": intent, "sql": sql_query, "rows": len(df),
-            "df_preview": get_smart_preview(df, pillar, intent), "raw_metrics": ml_result
         }
 
     # PATH D: AGGREGATION
