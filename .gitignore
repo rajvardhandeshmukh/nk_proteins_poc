@@ -106,4 +106,5 @@ ENV/
 # Project Specific
 cached_model_output.json
 logs/
+saved_models/
 .gemini/

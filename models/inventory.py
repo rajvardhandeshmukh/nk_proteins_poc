@@ -4,8 +4,9 @@ warnings.filterwarnings('ignore')
 
 INV_FILE = 'data/nk_inventory_2022_2026_feb.csv'
 
-def run_inventory():
-    df = pd.read_csv(INV_FILE)
+def run_inventory(df=None):
+    if df is None:
+        df = pd.read_csv(INV_FILE)
 
     dead     = df[df['is_dead_stock'] == 1]
     reorder  = df[df['needs_reorder'] == 1]

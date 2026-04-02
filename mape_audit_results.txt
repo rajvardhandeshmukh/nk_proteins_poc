@@ -1,0 +1,57 @@
+======================================================================
+MAPE AUDIT — NK Proteins Sales Forecasting Model
+======================================================================
+
+Dataset: 680 rows, 34 unique dates
+Date range: 2023-05-01 00:00:00 to 2026-02-01 00:00:00
+Unique products: 6
+Unique regions: 3
+
+──────────────────────────────────────────────────────────────────────
+XGBoost MAPE at different train/test splits:
+──────────────────────────────────────────────────────────────────────
+  Split 70/30: Train=169, Test=73, MAPE=34.21%
+  Split 75/25: Train=181, Test=61, MAPE=11.53%
+  Split 80/19: Train=193, Test=49, MAPE=10.22%
+  Split 85/15: Train=205, Test=37, MAPE=9.85%
+  Split 90/9: Train=217, Test=25, MAPE=4.98%
+
+──────────────────────────────────────────────────────────────────────
+Per-Region MAPE (80/20 split):
+──────────────────────────────────────────────────────────────────────
+  Gujarat: MAPE=9.82% (27 test rows)
+  Maharashtra: MAPE=10.71% (22 test rows)
+
+──────────────────────────────────────────────────────────────────────
+Per-Product MAPE (top 5 products by test volume):
+──────────────────────────────────────────────────────────────────────
+  Tirupati Rice Bran Oil 1L: MAPE=10.35% (44 rows)
+  De-Oiled Cake 25Kg: MAPE=9.09% (5 rows)
+
+──────────────────────────────────────────────────────────────────────
+Prophet MAPE (aggregate monthly revenue):
+──────────────────────────────────────────────────────────────────────
+  Train months: 31
+  Test months: 3 (held out)
+  Prophet MAPE: 1.83%
+
+  2025-12: Actual=Rs29.8L, Predicted=Rs28.8L, Error=3.3%
+  2026-01: Actual=Rs31.2L, Predicted=Rs31.0L, Error=0.5%
+  2026-02: Actual=Rs28.1L, Predicted=Rs28.6L, Error=1.7%
+
+======================================================================
+FINAL AUDIT SUMMARY
+======================================================================
+  XGBoost MAPE (80/20 split, product-level): 10.22%
+  Prophet MAPE (held-out 3 months, aggregate): 1.83%
+  Current Confidence Gate Threshold: >25% MAPE
+
+  ⚠️  XGBoost is CLOSE (10-15%) — acceptable with disclaimer
+  ✅ Prophet MEETS the ≤10% MAPE target
+
+  RECOMMENDED CONFIDENCE GATE THRESHOLDS:
+    - High Confidence: ≤10% MAPE (present confidently)
+    - Medium Confidence: 10-15% MAPE (present with 'approximate' disclaimer)
+    - Low Confidence: 15-25% MAPE (present with strong warning)
+    - BLOCK: >25% MAPE (do not present forecast)
+======================================================================

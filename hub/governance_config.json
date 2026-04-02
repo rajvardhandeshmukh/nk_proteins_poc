@@ -1,0 +1,6 @@
+{
+    "mape_gates": {
+        "high_threshold": 10.0,
+        "caution_threshold": 25.0
+    }
+}

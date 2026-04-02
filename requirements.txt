@@ -8,3 +8,5 @@ python-dotenv==1.0.1
 requests==2.31.0
 scipy==1.12.0
 ollama>=0.6.1
+pymssql==2.3.0
+sqlalchemy==2.0.28

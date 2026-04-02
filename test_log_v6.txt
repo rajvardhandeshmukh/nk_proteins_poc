@@ -1,0 +1,37 @@
+
+==== Testing: What was the total revenue for the West region last year? ====
+[*] DEBUG RAW INTENT: 'aggregation'
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] DEBUG RAW PILLAR: 'sales'
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Agentic Hub v4: Executing T-SQL:
+SELECT TOP 5000 SUM(revenue) AS total_revenue 
+FROM fact_sales 
+WHERE region = 'West' AND year = 2025
+[*] Telemetry Logged: 1 rows in 16.28s | Intent: aggregation
+Intent: aggregation
+SQL: SELECT TOP 5000 SUM(revenue) AS total_revenue ...
+Rows: 1
+Narrative snippet: The total revenue for the West region last year is not available. Based on 1...
+
+==== Testing: Forecast revenue for the next 3 months. ====
+[*] DEBUG RAW INTENT: 'forecasting'
+[*] Agentic Hub v4: Intent -> FORECASTING
+[*] DEBUG RAW PILLAR: 'sales'
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Full time-windowed pull for sales...
+[*] Agentic Hub v4: Pulled 680 rows. Running ML (sales)...
+[*] Telemetry Logged: 680 rows in 20.6s | Intent: forecasting
+Intent: forecasting
+SQL: SELECT date, product_id, product_name, region, quantity_sold, revenue, margin_pct, discount_pct, returns_qty, is_festive ...
+Rows: 680
+Narrative snippet: The forecasted revenue for the next three months is ₹26.40 L for March 2026, ₹29.73...
+
+==== Testing: How are the sales for FreshMart Vadodara looking? ====
+[*] DEBUG RAW INTENT: 'hybrid'
+[*] Agentic Hub v4: Intent -> HYBRID
+[*] DEBUG RAW PILLAR: 'sales'
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Extracted entity -> 'freshmart vadodara'
+[*] Agentic Hub v4: Resolved -> customer_name = 'FreshMart Vadodara' (score: 1.00)

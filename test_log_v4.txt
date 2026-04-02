@@ -1,0 +1,36 @@
+
+==== Testing: What was the total revenue for the West region last year? ====
+[*] DEBUG RAW INTENT: 'aggregation'
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] DEBUG RAW PILLAR: 'aggregation'
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 2.0s | Intent: conversational
+Result: 
+
+==== Testing: Forecast revenue for the next 3 months. ====
+[*] DEBUG RAW INTENT: 'aggregation'
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] DEBUG RAW PILLAR: 'aggregation'
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 2.04s | Intent: conversational
+Result: 
+
+==== Testing: How are the sales for FreshMart Vadodara looking? ====
+[*] DEBUG RAW INTENT: 'aggregation'
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] DEBUG RAW PILLAR: 'aggregation'
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 1.87s | Intent: conversational
+Result: 
+
+==== Testing: Give me the biggest risks across the business right now. ====
+[*] DEBUG RAW INTENT: 'aggregation'
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] DEBUG RAW PILLAR: 'aggregation'
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 2.24s | Intent: conversational
+Result: 

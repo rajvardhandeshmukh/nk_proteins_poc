@@ -1,0 +1,35 @@
+
+==== Testing: What was the total revenue for the West region last year? ====
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 2.34s | Intent: conversational
+Result: 
+
+==== Testing: Forecast revenue for the next 3 months. ====
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 1.87s | Intent: conversational
+Result: 
+
+==== Testing: How are the sales for FreshMart Vadodara looking? ====
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 1.91s | Intent: conversational
+Result: 
+
+==== Testing: Segment my customers by profitability. ====
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 2.01s | Intent: conversational
+Result: 
+
+==== Testing: Give me the biggest risks across the business right now. ====
+[*] Agentic Hub v4: Intent -> AGGREGATION
+[*] Agentic Hub v4: Pillar -> SALES
+[*] Agentic Hub v4: Generating aggregation SQL via LLM...
+[*] Telemetry Logged: 0 rows in 1.84s | Intent: conversational
+Result: 

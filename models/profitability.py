@@ -6,8 +6,9 @@ warnings.filterwarnings('ignore')
 
 PROF_FILE = 'data/nk_sales_data_2022_2026_feb.csv'
 
-def run_profitability():
-    df = pd.read_csv(PROF_FILE)
+def run_profitability(df=None):
+    if df is None:
+        df = pd.read_csv(PROF_FILE)
     
     # Adapt column names from sales data
     df = df.rename(columns={'margin_pct': 'net_margin_pct', 'discount_pct': 'discount'})

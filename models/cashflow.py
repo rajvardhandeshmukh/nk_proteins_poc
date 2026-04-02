@@ -4,9 +4,10 @@ warnings.filterwarnings('ignore')
 
 AR_FILE = 'data/nk_receivables_2022_2026_feb.csv'
 
-def run_cashflow():
-    df = pd.read_csv(AR_FILE, parse_dates=['invoice_date',
-                                           'due_date','received_date'])
+def run_cashflow(df=None):
+    if df is None:
+        df = pd.read_csv(AR_FILE, parse_dates=['invoice_date',
+                                               'due_date','received_date'])
 
     prob = {0: 0.98, 1: 0.92, 2: 0.70, 3: 0.45, 4: 0.20}
     df['bucket']   = pd.cut(df['days_overdue'],
