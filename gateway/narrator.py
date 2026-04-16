@@ -30,32 +30,67 @@ def narrate(plan: dict, data: dict) -> str:
         fixes = [f"'{v['original']}' → '{v['corrected']}'" for v in corrections.values()]
         correction_note = f"\n*(Auto-corrected: {', '.join(fixes)})*\n\n"
 
-    # Send the raw data directly to Granite for decoration
-    sys_prompt = (
-        "You are an elite Business Analyst for NK Proteins. Summarize the provided data. "
-        "CRITICAL RULE 1: If you see the same region multiple times with different units (KG, EA, CS), you MUST sum their revenues "
-        "to report the true 'Total Regional Revenue'. Do not ignore small entries."
-        "CRITICAL RULE 2: Every currency value MUST be prefixed with ₹ (INR). The dollar ($) is strictly forbidden. "
-        "Write 2-3 concise sentences. Start with the Grand Total across all regions."
-    )
+    # --- Dynamic System Prompt (Targeted) ---
+    if intent == "whole_business_snapshot":
+        sys_prompt = (
+            "You are the Executive AI of NK Proteins. Format this as a C-Suite Dashboard. "
+            "Structure your answer exactly into these 4 sections with bold headings:\n"
+            "1. **Revenue Dashboard** (Include 30d Total, MoM % and YoY % growth against prior periods)\n"
+            "2. **Profitability & Liquidity** (Gross Margin Estimate vs Customer Receipts)\n"
+            "3. **Inventory Health** (Dead Stock vs Low Stock alerts)\n"
+            "4. **Market Insights** (Top Selling Products list)\n"
+            "Be concise. Use bullet points. Every currency must be prefixed with ₹ (INR)."
+        )
+    else:
+        sys_prompt = (
+            "You are an elite Business Analyst for NK Proteins. Summarize the provided data. "
+            "CRITICAL RULE 1: If you see the same region multiple times with different units (KG, EA, CS), you MUST sum their revenues "
+            "to report the true 'Total Regional Revenue'. Do not ignore small entries."
+            "CRITICAL RULE 2: Every currency value MUST be prefixed with ₹ (INR). The dollar ($) is strictly forbidden. "
+            "Write 2-3 concise sentences. Start with the Grand Total across all regions."
+        )
     
     # Pre-calculate totals for the 'Accuracy Auditor' (Internal validation)
     regional_totals = {}
-    for r in rows:
-        reg = r.get("region", "Global")
-        regional_totals[reg] = regional_totals.get(reg, 0) + r.get("total_revenue", 0)
+    total_for_audit = 0
     
-    grand_total = sum(regional_totals.values())
-    
-    user_prompt = (
-        f"Context: {intent} comparison.\n"
-        f"Reference Totals (Verify your math against these sums):\n"
-        f"- Grand Total: ₹{grand_total:,.2f}\n"
-        + "\n".join([f"- {k} Total: ₹{v:,.2f}" for k, v in regional_totals.items()]) + "\n"
-        f"\nRaw Data (rows: {row_count}):\n"
-        f"```json\n{json.dumps(rows[:15], indent=2)}\n```\n"
-        "Executive Summary:"
-    )
+    if intent != "whole_business_snapshot":
+        for r in rows:
+            reg = r.get("region", "Global")
+            regional_totals[reg] = regional_totals.get(reg, 0) + r.get("total_revenue", 0)
+        total_for_audit = sum(regional_totals.values())
+        
+        user_prompt = (
+            f"Context: {intent} comparison.\n"
+            f"Reference Totals (Verify your math against these sums):\n"
+            f"- Grand Total: ₹{total_for_audit:,.2f}\n"
+            + "\n".join([f"- {k} Total: ₹{v:,.2f}" for k, v in regional_totals.items()]) + "\n"
+            f"\nRaw Data (rows: {row_count}):\n"
+            f"```json\n{json.dumps(rows[:15], indent=2)}\n```\n"
+            "Executive Summary:"
+        )
+    else:
+        # Dashboard context
+        d = rows[0]
+        total_for_audit = d.get("revenue_annual", 0)
+        
+        # Pre-calculate Growth % for the LLM
+        rev_30d = d.get('revenue_30d') or 0
+        rev_prev_30d = d.get('revenue_prev_30d') or 0
+        rev_prev_year = d.get('revenue_prev_year_30d') or 0
+        
+        mom_growth = ((rev_30d - rev_prev_30d) / rev_prev_30d * 100) if rev_prev_30d else 0
+        yoy_growth = ((rev_30d - rev_prev_year) / rev_prev_year * 100) if rev_prev_year else 0
+
+        user_prompt = (
+            f"Context: Executive Dashboard Snapshot.\n"
+            f"Raw KPI Data:\n"
+            f"```json\n{json.dumps(d, indent=2)}\n```\n"
+            f"Calculated Growth:\n"
+            f"- MoM: {mom_growth:+.1f}%\n"
+            f"- YoY: {yoy_growth:+.1f}%\n"
+            "Please provide the 4-section dashboard summary:"
+        )
     
     logger.info("Triggering Intelligent Narration (Phase 2C) for intent: %s", intent)
     try:
@@ -69,12 +104,11 @@ def narrate(plan: dict, data: dict) -> str:
         
         if response.get("status") == "success":
             llm_text = response.get("text", "").strip()
-            # Accuracy Auditor: Ensure the Grand Total is mentioned correctly
-            # (Checks if the leading digits of the grand total are present in any format)
+            # Accuracy Auditor: Ensure the primary total is mentioned correctly
             audit_pass = True
-            if grand_total > 100:
+            if total_for_audit > 100:
                 # Get the first 4 significant digits (e.g. 122.3 from 122315136)
-                clean_target = str(int(grand_total))[:4]
+                clean_target = str(int(total_for_audit))[:4]
                 clean_text = llm_text.replace(",", "").replace(".", "")
                 if clean_target not in clean_text:
                     logger.warning("Accuracy Auditor: Expected number segment '%s' not found in summary. Potential math error.", clean_target)

@@ -199,15 +199,63 @@ SQL_TEMPLATES = {
         "table": "fact_cashflow",
         "query": """
             SELECT
-                YEAR(ClearingDate) AS yr,
-                MONTH(ClearingDate) AS mo,
-                FORMAT(ClearingDate, 'MMM yyyy') AS month_label,
+                YEAR(TRY_CAST(ClearingDate AS DATE)) AS yr,
+                MONTH(TRY_CAST(ClearingDate AS DATE)) AS mo,
+                FORMAT(TRY_CAST(ClearingDate AS DATE), 'MMM yyyy') AS month_label,
                 SUM(Amount) AS total_realized_cash
             FROM fact_cashflow
-            WHERE transaction_type = 'customer_receipt'
-              AND ClearingDate BETWEEN '2024-10-01' AND '2026-04-30'
-            GROUP BY YEAR(ClearingDate), MONTH(ClearingDate), FORMAT(ClearingDate, 'MMM yyyy')
+            WHERE CashFlowType = 'customer_receipt'
+              AND TRY_CAST(ClearingDate AS DATE) BETWEEN '2024-10-01' AND '2026-04-30'
+            GROUP BY YEAR(TRY_CAST(ClearingDate AS DATE)), MONTH(TRY_CAST(ClearingDate AS DATE)), FORMAT(TRY_CAST(ClearingDate AS DATE), 'MMM yyyy')
             ORDER BY yr, mo
+        """,
+        "params": {},
+        "optional_filters": {},
+    },
+
+    # =========================================================================
+    # 9. WHOLE BUSINESS SNAPSHOT (EXECUTIVE DASHBOARD)
+    # =========================================================================
+    "whole_business_snapshot": {
+        "description": "Executive dashboard summary across all departments with YoY and MoM growth.",
+        "table": "fact_sales, fact_inventory, fact_cashflow",
+        "query": """
+            WITH UniqueInventory AS (
+                SELECT product_name, AVG(unit_cost) as avg_unit_cost
+                FROM fact_inventory
+                GROUP BY product_name
+            ),
+            TopProducts AS (
+                SELECT TOP 5 product_name, SUM(revenue) as rev
+                FROM fact_sales
+                WHERE event_date >= DATEADD(day, -30, '20260430')
+                GROUP BY product_name
+                ORDER BY rev DESC
+            )
+            SELECT 
+                'Total Business Intelligence' AS dashboard_label,
+                
+                -- SECTION A: REVENUE & GROWTH
+                (SELECT SUM(revenue) FROM fact_sales WHERE event_date >= DATEADD(day, -30, '20260430')) AS revenue_30d,
+                (SELECT SUM(revenue) FROM fact_sales WHERE event_date >= DATEADD(day, -60, '20260430') AND event_date < DATEADD(day, -30, '20260430')) AS revenue_prev_30d,
+                (SELECT SUM(revenue) FROM fact_sales WHERE event_date >= DATEADD(year, -1, DATEADD(day, -30, '20260430')) AND event_date <= DATEADD(year, -1, '20260430')) AS revenue_prev_year_30d,
+                (SELECT SUM(revenue) FROM fact_sales WHERE event_date >= DATEADD(year, -1, '20260430')) AS revenue_annual,
+                
+                -- SECTION B: PROFITABILITY (Hardened against duplication)
+                (SELECT SUM(s.revenue - (s.quantity * i.avg_unit_cost)) 
+                 FROM fact_sales s 
+                 LEFT JOIN UniqueInventory i ON s.product_name = i.product_name 
+                 WHERE s.event_date >= DATEADD(day, -30, '20260430')) AS gross_profit_30d,
+                 
+                -- SECTION C: LIQUIDITY
+                (SELECT SUM(Amount) FROM fact_cashflow 
+                 WHERE CashFlowType = 'customer_receipt' 
+                   AND TRY_CAST(ClearingDate AS DATE) >= DATEADD(day, -30, '20260430')) AS cash_receipts_30d,
+                   
+                -- SECTION D: INVENTORY & TOP SELLERS
+                (SELECT COUNT(*) FROM fact_inventory WHERE current_stock > 0 AND (total_sales_30d = 0 OR (current_stock / NULLIF((total_sales_30d / 30.0), 0)) > 90)) AS dead_stock_skus,
+                (SELECT COUNT(*) FROM fact_inventory WHERE current_stock <= 10) AS low_stock_alerts,
+                (SELECT STRING_AGG(product_name, ', ') FROM TopProducts) AS top_sellers
         """,
         "params": {},
         "optional_filters": {},

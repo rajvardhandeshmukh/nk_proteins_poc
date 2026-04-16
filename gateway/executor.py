@@ -106,8 +106,13 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
             query = query.replace(f"{{{filter_key}}}", "")
 
     # MOP-UP: Force Absolute Ground-Truth Reference
-    # This bypasses any local synonyms or schema-shadowing causing the 122M discrepancy.
+    # This bypasses any local synonyms or schema-shadowing causing discrepancies.
     query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
+    query = query.replace("fact_inventory", "[nk_proteins].[dbo].[fact_inventory]")
+    query = query.replace("fact_cashflow", "[nk_proteins].[dbo].[fact_cashflow]")
+    
+    # Schema Safety: Ensure legacy 'transaction_type' is always redirected to 'CashFlowType'
+    query = query.replace("transaction_type", "CashFlowType")
 
     return query.strip(), safe_params
 
@@ -127,6 +132,10 @@ def execute_query(intent: str, params: dict) -> dict:
     Output: {"status": "success", "data": [...], "row_count": N, "query_ms": M}
     """
     start = time.time()
+    # FORCE RELOAD
+    import importlib
+    from . import sql_templates
+    importlib.reload(sql_templates)
 
     # 1. Build the safe query (validates types + fuzzy corrections)
     try:

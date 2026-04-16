@@ -116,6 +116,12 @@ INTENT_RULES = [
         "boosters":  [["customer"], ["projection", "forecast", "status"]],
         "base_conf": 0.95,
     },
+    {
+        "intent": "whole_business_snapshot",
+        "primary":   [["performance", "summary", "how is business", "whole business", "overall status", "dashboard"]],
+        "boosters":  [["current", "today", "now", "status"]],
+        "base_conf": 0.98,
+    },
 ]
 
 
