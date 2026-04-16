@@ -74,15 +74,19 @@ ENTITY_CATEGORY_TO_COLUMN = {
     'suppliers': 'supplier',
 }
 
-def fuzzy_resolve_entity(user_input, cutoff=0.90):
-    """Matches user input against all known DB entities."""
+def fuzzy_resolve_entity(user_input, cutoff=0.90, type_hint=None):
+    """Matches user input against all known DB entities. Supports type_hint for de-ambiguation."""
     user_input = user_input.lower().strip()
     best_match = None
     best_score = 0
     actual_category = None
     
-    for category, entities in ENTITY_CACHE.items():
+    # If type_hint is provided (e.g. "region"), we primarily look in that category.
+    categories_to_check = [type_hint + 's'] if type_hint and (type_hint + 's') in ENTITY_CACHE else ENTITY_CACHE.keys()
+    
+    for category in categories_to_check:
         if category == 'all': continue
+        entities = ENTITY_CACHE.get(category, [])
         for e in entities:
             score = SequenceMatcher(None, user_input, e.lower()).ratio()
             if score > best_score:
@@ -144,7 +148,9 @@ def get_smart_preview(df, pillar, intent):
         logger.error("Smart preview failed for pillar %s: %s", pillar, e, exc_info=True)
         
     display_cols = [col for col in preview_cols if col in df.columns]
-    return df[display_cols].head(5)
+    # Dynamic Limit: Audits (anomalies) get higher visibility (15 rows) vs 5 for trends.
+    limit = 15 if intent == 'anomaly_detection' else 5
+    return df[display_cols].head(limit)
 
 def compute_provenance(df, pillar):
     from .config import PILLAR_DATE_COL
@@ -157,17 +163,64 @@ def compute_provenance(df, pillar):
     return "current snapshot"
 
 def extract_sql_from_response(response_text):
+    if response_text is None: return ""
     pattern = r"```(?:sql)?\s+(.*?)\s+```"
     match = re.search(pattern, response_text, re.DOTALL | re.IGNORECASE)
     if match: return match.group(1).strip()
     return response_text.replace('```sql', '').replace('```', '').strip()
 
 def validate_and_constrain_sql(sql):
+    """v7.1 Security & Sandbox Validator: Restricts joins, enforces dates, and blocks scans."""
+    if not sql: return ""
     sql_upper = sql.upper().strip()
-    if any(kw in sql_upper for kw in ["DROP ", "DELETE ", "UPDATE ", "INSERT ", "ALTER ", "TRUNCATE "]):
-        raise ValueError("Destructive SQL commands are strictly forbidden.")
-    if not sql_upper.startswith("SELECT"):
-        raise ValueError("Query must begin with SELECT.")
-    if " WHERE " not in sql_upper and " TOP " not in sql_upper:
+    
+    # 1. Block Destructive or Unauthorized Commands
+    blocked = ["DROP ", "DELETE ", "UPDATE ", "INSERT ", "ALTER ", "TRUNCATE ", "EXEC ", "UNION ", "INTO ", "SYS."]
+    if any(kw in sql_upper for kw in blocked):
+        raise ValueError(f"Security Alert: Blocked keyword detected.")
+    
+    # 2. Join Validation
+    if " JOIN " in sql_upper:
+        # Check if join is on an authorized key
+        if not re.search(r'ON\s+.*\.(CUSTOMER_ID|PRODUCT_ID)', sql_upper):
+             raise ValueError("Join Security: Aggregation joins are only permitted on 'customer_id' or 'product_id'.")
+    
+    # 3. Date Enforcement (Prevent Full Table Scans)
+    # Refined Check: Ensure the date filter is both present AND syntactically complete
+    has_date_filter = any(pat in sql_upper for pat in [" DATE ", "WEEK ", "MONTH ", "YEAR ", " BETWEEN ", "DATE_COL"])
+    # If the LLM tried to use DATEADD but left it dangling, we treat it as missing to trigger a clean injection
+    if "DATEADD" in sql_upper and not sql_upper.count("(") == sql_upper.count(")"):
+        has_date_filter = False
+
+    if not has_date_filter:
+        # Infer the date column if it's a known table
+        table_match = re.search(r'FROM\s+(\w+)', sql_upper)
+        if table_match:
+            table_name = table_match.group(1).lower()
+            from .config import PILLAR_DATE_COL
+            # Match pillar by searching substring or direct map
+            date_col = next((v for k,v in PILLAR_DATE_COL.items() if k in table_name), None)
+            
+            if date_col:
+                print(f"[*] Validator: Injecting 12-month date filter on '{date_col}'")
+                # Clean up any partial date filters first
+                sql = re.sub(r'(?i)AND\s+\w+\s*[>=<]+\s*DATEADD.*$', '', sql).strip()
+                
+                # Regex-based Case-Insensitive Injection
+                if re.search(r'(?i)\bWHERE\b', sql):
+                     sql = re.sub(r'(?i)\bWHERE\b', f"WHERE {date_col} >= DATEADD(month, -12, GETDATE()) AND ", sql, count=1)
+                elif re.search(r'(?i)\bGROUP BY\b', sql):
+                     sql = re.sub(r'(?i)\bGROUP BY\b', f"WHERE {date_col} >= DATEADD(month, -12, GETDATE()) GROUP BY ", sql, count=1)
+                elif re.search(r'(?i)\bORDER BY\b', sql):
+                     sql = re.sub(r'(?i)\bORDER BY\b', f"WHERE {date_col} >= DATEADD(month, -12, GETDATE()) ORDER BY ", sql, count=1)
+                else:
+                     sql += f" WHERE {date_col} >= DATEADD(month, -12, GETDATE())"
+
+    # 4. Syntactic Self-Healing (Parenthesis Balance)
+    # Fix instances of 'GETDATE()' or 'DATEADD(...' missing final brackets
+    if sql.count("(") > sql.count(")"):
+        sql += ")" * (sql.count("(") - sql.count(")"))
+    if " TOP " not in sql_upper:
         sql = re.sub(r'(?i)^SELECT\s+', 'SELECT TOP 5000 ', sql)
+        
     return sql

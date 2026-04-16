@@ -108,3 +108,6 @@ cached_model_output.json
 logs/
 saved_models/
 .gemini/
+
+openapi.yaml
+.env

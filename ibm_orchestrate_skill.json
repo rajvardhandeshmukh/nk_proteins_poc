@@ -1,0 +1,106 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "NK Proteins Intelligence Gateway",
+    "version": "1.0.0",
+    "description": "Hardened SQL Analytics Gateway that executes natural language business queries safely.",
+    "x-ibm-skill-type": "imported"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Local Development Server"
+    }
+  ],
+  "paths": {
+    "/query": {
+      "post": {
+        "summary": "Execute Analytical Query",
+        "operationId": "executeAnalyticalQuery",
+        "description": "Takes a natural language query from IBM Orchestrate, converts it to an intent, safely executes against the data warehouse, and returns both structured data and a natural language summary.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input format"
+          },
+          "500": {
+            "description": "Internal server execution error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "QueryRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The natural language query from the business user.",
+            "example": "show revenue for the last 6 months in Gujarat"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "QueryResponse": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "object",
+            "description": "The extracted intent plan and constraints.",
+            "properties": {
+              "intent": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["template", "dynamic"]
+              },
+              "confidence": {
+                "type": "number"
+              }
+            }
+          },
+          "data": {
+            "type": "object",
+            "description": "The raw structured data returned from the database execution.",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "row_count": {
+                "type": "integer"
+              }
+            }
+          },
+          "answer": {
+            "type": "string",
+            "description": "The AI-generated executive summary analyzing the returned data. This can be mapped directly to IBM Orchestrate's chat UI."
+          }
+        }
+      }
+    }
+  }
+}

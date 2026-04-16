@@ -1,19 +1,18 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  nk_proteins_poc:
+  nk_proteins_ibm_gateway:
     build: .
-    container_name: nk_proteins_poc
-    restart: always
+    container_name: nk_proteins_ibm_gateway
+    restart: unless-stopped
     ports:
-      - "8501:8501"
+      - "8100:8100"
     env_file:
       - .env
     volumes:
       - ./logs:/app/logs
-      - ./data:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
       interval: 30s
       timeout: 10s
       retries: 3

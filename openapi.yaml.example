@@ -1,0 +1,16 @@
+openapi: 3.0.2
+info:
+  title: "NK Proteins Elite CoPilot"
+  version: "3.5.0"
+  description: "Deterministic SQL extraction for NK Proteins ERP. Source: ERP_V3."
+
+servers:
+  - url: "https://{{your_ngrok_url_here}}"
+    description: "Production Gateway (Port 8000)"
+
+paths:
+  /query:
+    post:
+      summary: "Universal ERP Query Engine"
+      operationId: "EXEC_SQL_UNIVERSAL"
+      # ... (rest of the spec)
