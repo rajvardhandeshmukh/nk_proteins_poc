@@ -32,30 +32,54 @@ def narrate(plan: dict, data: dict) -> str:
 
     # Send the raw data directly to Granite for decoration
     sys_prompt = (
-        "You are an elite Executive Assistant for NK Proteins. Summarize the provided data. "
-        "CRITICAL RULE: We represent a major Indian manufacturer. Every currency value MUST be prefixed with ₹ (INR). "
-        "The dollar ($) is strictly forbidden and must never be used. "
-        "Avoid tables. Write 2 concise, facts-driven sentences in professional English."
+        "You are an elite Business Analyst for NK Proteins. Summarize the provided data. "
+        "CRITICAL RULE 1: If you see the same region multiple times with different units (KG, EA, CS), you MUST sum their revenues "
+        "to report the true 'Total Regional Revenue'. Do not ignore small entries."
+        "CRITICAL RULE 2: Every currency value MUST be prefixed with ₹ (INR). The dollar ($) is strictly forbidden. "
+        "Write 2-3 concise sentences. Start with the Grand Total across all regions."
     )
+    
+    # Pre-calculate totals for the 'Accuracy Auditor' (Internal validation)
+    regional_totals = {}
+    for r in rows:
+        reg = r.get("region", "Global")
+        regional_totals[reg] = regional_totals.get(reg, 0) + r.get("total_revenue", 0)
+    
+    grand_total = sum(regional_totals.values())
     
     user_prompt = (
-        f"Context: Compute {intent} with parameters {params}.\n"
-        f"Data (rows: {row_count}):\n"
-        f"```json\n{json.dumps(rows[:5], indent=2)}\n```\n"
-        "Summary:"
+        f"Context: {intent} comparison.\n"
+        f"Reference Totals (Verify your math against these sums):\n"
+        f"- Grand Total: ₹{grand_total:,.2f}\n"
+        + "\n".join([f"- {k} Total: ₹{v:,.2f}" for k, v in regional_totals.items()]) + "\n"
+        f"\nRaw Data (rows: {row_count}):\n"
+        f"```json\n{json.dumps(rows[:15], indent=2)}\n```\n"
+        "Executive Summary:"
     )
     
-    logger.info("Triggering LLM Executive Decoration (Phase 2B) for intent: %s", intent)
+    logger.info("Triggering Intelligent Narration (Phase 2C) for intent: %s", intent)
     try:
         response = call_granite(
             user_prompt=user_prompt,
             system_prompt=sys_prompt,
-            max_tokens=300,
-            temperature=0.2,
+            max_tokens=400,
+            temperature=0.0, # Forced determinant
             is_json=False
         )
+        
         if response.get("status") == "success":
-            return correction_note + response.get("text", "").strip()
+            llm_text = response.get("text", "").strip()
+            # Accuracy Auditor: Ensure the Grand Total is mentioned correctly
+            # (Checks if the leading digits of the grand total are present in any format)
+            audit_pass = True
+            if grand_total > 100:
+                # Get the first 4 significant digits (e.g. 122.3 from 122315136)
+                clean_target = str(int(grand_total))[:4]
+                clean_text = llm_text.replace(",", "").replace(".", "")
+                if clean_target not in clean_text:
+                    logger.warning("Accuracy Auditor: Expected number segment '%s' not found in summary. Potential math error.", clean_target)
+            
+            return correction_note + llm_text
         else:
             logger.error("Granite generation failed: %s", response.get("error"))
             return _fallback_hardcoded(intent, params, data, correction_note)

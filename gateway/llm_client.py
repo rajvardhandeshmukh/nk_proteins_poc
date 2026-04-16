@@ -63,7 +63,7 @@ def call_granite(
     system_prompt: str,
     model_id: str = None,
     max_tokens: int = 512,
-    temperature: float = 0.1,
+    temperature: float = 0.0,
     is_json: bool = True,
 ) -> dict:
     """
