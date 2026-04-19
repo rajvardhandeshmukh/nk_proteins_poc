@@ -14,7 +14,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -28,6 +28,7 @@ from .narrator import narrate
 from .sql_templates import SQL_TEMPLATES, VALID_INTENTS
 from .validators import load_entity_cache
 from .telemetry import log_error, log_plan, log_narration
+from .governance import get_reliability, get_governance_notes, detect_conflicts, ReliabilityLevel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
@@ -76,14 +77,17 @@ class PlanResponse(BaseModel):
     params: dict = {}
     mode: str = "template"
     confidence: float = 0.0
+    reliability_level: ReliabilityLevel = ReliabilityLevel.MEDIUM
     original_query: str = ""
 
 
 class FullResponse(BaseModel):
     """Complete pipeline response: plan + data + narration."""
-    plan: dict
+    plan: PlanResponse
     data: dict
     answer: str
+    governance_notes: List[str] = []
+    conflict_flags: List[str] = []
     pipeline_ms: int = 0
 
 
@@ -133,97 +137,138 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
     pipeline_start = time.time()
 
     # ENTRY LOGGING: See exactly what Orchestrate sent
-    print("\n" + "🚀" * 30)
+    print("\n" + "=" * 30)
     print(f"[*] INCOMING REQUEST FROM ORCHESTRATE")
     print(f"[*] PAYLOAD: {request.dict()}")
-    print("🚀" * 30 + "\n")
+    print("=" * 30 + "\n")
 
-    # Step 1: Plan (with confidence scoring)
-    plan = plan_query(request.query)
-    confidence = plan.get("confidence", 0.0)
-    log_plan(
-        user_question=request.query,
-        extracted_intent=plan.get("intent", "unknown"),
-        extracted_params=plan.get("params", {}),
-        confidence=confidence,
-    )
+    try:
+        # Step 1: Plan (with confidence scoring)
+        plan_dict = plan_query(request.query)
+        confidence = plan_dict.get("confidence", 0.0)
+        
+        # Step 1B: LLM Planner Fallback
+        if plan_dict.get("mode") == "dynamic" or confidence < 0.70:
+            logger.info(f"Low confidence ({confidence}) or dynamic mode. Falling back to LLM Planner.")
+            plan_dict = plan_query_llm(request.query)
 
-    # Step 1B: LLM Planner Fallback
-    if plan.get("mode") == "dynamic" or confidence < 0.70:
-        logger.info(f"Low confidence ({confidence}) or dynamic mode. Falling back to LLM Planner.")
-        plan = plan_query_llm(request.query)
+        # Step 1C: Reliability & Governance Mapping
+        plan_dict["reliability_level"] = get_reliability(plan_dict["intent"])
+        plan = PlanResponse(**plan_dict)
 
-    # TERMINAL LOGGING: Visual Audit of identified strategy
-    print("\n" + "="*50)
-    print(f"[*] QUERY IDENTIFIED: {plan.get('intent', 'DYNAMIC_GENERATION')}")
-    print(f"[*] STRATEGY:         {plan.get('mode', 'N/A').upper()}")
-    print(f"[*] PARAMETERS:       {plan.get('params', {})}")
-    print(f"[*] USER QUESTION:    {request.query}")
-    print("="*50 + "\n")
+        log_plan(
+            user_question=request.query,
+            extracted_intent=plan.intent,
+            extracted_params=plan.params,
+            confidence=confidence,
+        )
 
-    # Step 2: Execute
-    if plan.get("mode") == "template":
-        data = execute_query(intent=plan["intent"], params=plan["params"])
-    else:
-        # Step 2B: LLM SQL Generation Fallback
-        logger.info({
-            "mode": "dynamic",
-            "reason": "low_confidence_or_dynamic",
-            "query": request.query
-        })
-        sql_info = generate_sql_dynamic(request.query)
-        if sql_info["status"] == "error":
-            logger.error(f"Dynamic SQL Generation Failed: {sql_info['error']}")
-            raise HTTPException(
-                status_code=500, 
-                detail=f"I couldn't run this dynamic query safely. Error: {sql_info['error']}"
-            )
+        # TERMINAL LOGGING: Visual Audit of identified strategy
+        print("\n" + "="*50)
+        print(f"[*] QUERY IDENTIFIED: {plan.intent if plan.intent else 'DYNAMIC_GENERATION'}")
+        print(f"[*] RELIABILITY TIER: {plan.reliability_level}")
+        print(f"[*] PARAMS EXTRACTED: {plan.params}")
+        print(f"[*] USER QUESTION:    {request.query}")
+        print("="*50 + "\n")
+
+        # Step 2: Execute
+        if plan.mode == "template":
+            data = execute_query(intent=plan.intent, params=plan.params)
         else:
-            # Validate and execute
-            data = execute_raw_sql(sql_info["sql"])
-            if data["status"] == "error":
-                logger.error(f"Query execution failed: {data['message']}")
+            # Step 2B: LLM SQL Generation Fallback
+            logger.info({
+                "mode": "dynamic",
+                "reason": "low_confidence_or_dynamic",
+                "query": request.query
+            })
+            sql_info = generate_sql_dynamic(request.query)
+            if sql_info["status"] == "error":
+                logger.error(f"Dynamic SQL Generation Failed: {sql_info['error']}")
                 raise HTTPException(
                     status_code=500, 
-                    detail=f"Query execution failed!: {data['message']}"
+                    detail=f"I couldn't run this dynamic query safely. Error: {sql_info['error']}"
                 )
-            # GUARDRAIL: If dynamic SQL returned zero rows, say so explicitly.
-            # Do NOT let Watsonx/narrator estimate or fabricate data.
-            if data.get("row_count", 0) == 0:
-                pipeline_ms = round((time.time() - pipeline_start) * 1000)
-                return FullResponse(
-                    plan=plan,
-                    data=data,
-                    answer="No data available for the specified criteria. Try broadening your filters or time range.",
-                    pipeline_ms=pipeline_ms,
-                )
+            else:
+                # Validate and execute
+                data = execute_raw_sql(sql_info["sql"])
+                if data["status"] == "error":
+                    logger.error(f"Query execution failed: {data['message']}")
+                    raise HTTPException(
+                        status_code=500, 
+                        detail=f"Query execution failed!: {data['message']}"
+                    )
+                # GUARDRAIL: If dynamic SQL returned zero rows, say so explicitly.
+                if data.get("row_count", 0) == 0:
+                    pipeline_ms = round((time.time() - pipeline_start) * 1000)
+                    return FullResponse(
+                        plan=plan,
+                        data=data,
+                        answer="No data available for the specified criteria. Try broadening your filters or time range.",
+                        pipeline_ms=pipeline_ms,
+                    )
 
-    # Step 3: Narrate
-    narration_start = time.time()
-    answer = narrate(plan, data)
-    narration_ms = round((time.time() - narration_start) * 1000)
+        # Step 3: Narrate
+        narration_start = time.time()
+        # Pass governance context to creator
+        gov_notes = get_governance_notes(plan.intent, data)
+        conflicts = detect_conflicts(data.get("data", [{}])[0] if data.get("data") else {})
+        
+        answer = narrate(plan_dict, data)
+        narration_ms = round((time.time() - narration_start) * 1000)
 
-    # Confidence warning for medium-confidence matches
-    if plan.get("mode") == "template" and 0.70 <= confidence < 0.85:
-        answer = f"⚠️ Low confidence match ({confidence:.0%}). Verify this is what you asked for.\n\n{answer}"
-    elif plan.get("mode") == "dynamic":
-        answer = f"🧠 Generated via AI\n\n{answer}"
+        # Prepend reliability and notes to answer
+        header = f"[{plan.reliability_level.value} RELIABILITY]"
+        if gov_notes:
+            header += f"\nGovernance Notes: {', '.join(gov_notes)}"
+        if conflicts:
+            header += f"\n!!! CONFLICT DETECTED: {', '.join(conflicts)}"
+            
+        answer = f"{header}\n\n{answer}"
 
-    log_narration(
-        intent=plan["intent"],
-        input_row_count=data.get("row_count", 0),
-        output_length=len(answer),
-        latency_ms=narration_ms,
-    )
+        log_narration(
+            intent=plan.intent,
+            input_row_count=data.get("row_count", 0),
+            output_length=len(answer),
+            latency_ms=narration_ms,
+        )
 
-    pipeline_ms = round((time.time() - pipeline_start) * 1000)
+        pipeline_ms = round((time.time() - pipeline_start) * 1000)
+        return FullResponse(
+            plan=plan,
+            data=data,
+            answer=answer,
+            governance_notes=gov_notes,
+            conflict_flags=conflicts,
+            pipeline_ms=pipeline_ms,
+        )
 
-    return FullResponse(
-        plan=plan,
-        data=data,
-        answer=answer,
-        pipeline_ms=pipeline_ms,
-    )
+    except Exception as e:
+        logger.error(f"FATAL PIPELINE CRASH: {str(e)}", exc_info=True)
+        log_error(
+            endpoint="/query",
+            error_type="pipeline_panic",
+            message=str(e),
+            context={"query": request.query}
+        )
+        
+        pipeline_ms = round((time.time() - pipeline_start) * 1000)
+        
+        # Determine if we even have a plan/data to return
+        p = plan if 'plan' in locals() else PlanResponse(intent="error", original_query=request.query)
+        d = data if 'data' in locals() else {"status": "error", "message": str(e), "data": [], "row_count": 0}
+        
+        # Distinguish between network errors and logic errors
+        if "granite_network_error" in str(e).lower() or "connection" in str(e).lower():
+            friendly_msg = "⚠️ **Service Intermittently Offline**\n\nThe AI system had trouble reaching the summarizing service. However, the data was successfully retrieved from the database and is shown below."
+        else:
+            friendly_msg = f"⚠️ **System Logic Error**\n\nAn internal error occurred while processing your request: `{str(e)}`. Technical details have been logged."
+
+        return FullResponse(
+            plan=p,
+            data=d,
+            answer=friendly_msg,
+            pipeline_ms=pipeline_ms
+        )
 
 
 @app.post("/plan_query", response_model=PlanResponse)

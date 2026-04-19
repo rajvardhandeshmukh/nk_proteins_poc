@@ -141,6 +141,9 @@ def call_granite(
         if "timeout" in str(e).lower() or isinstance(e, TimeoutError):
             error_type = "granite_timeout"
             error_msg = f"Granite API Timeout: {str(e)}"
+        elif "failed to resolve" in str(e).lower() or "connection" in str(e).lower():
+            error_type = "granite_network_error"
+            error_msg = f"Granite Network Failure (Check Internet/DNS): {str(e)}"
         else:
             error_type = "granite_call_failed"
             

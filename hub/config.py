@@ -6,7 +6,7 @@ import os
 
 SQL_SCHEMA = """
 TABLE: fact_sales
-Columns: invoice_no, BillingDocumentItem, event_date, product_id, product_name, region, quantity, returns_qty, billing_quantity_unit, discount_pct, revenue, transaction_currency
+Columns: invoice_no, BillingDocumentItem, event_date, product_id, product_name, material_group, material_group_name, material_type_code, material_type_name, client_category, region, quantity, returns_qty, billing_quantity_unit, discount_pct, revenue, transaction_currency, SalesOrganization, DistributionChannel, Division, sales_office_code, sales_office_name, plant_code, plant_name, plant_city, plant_street, plant_post_code, Customer, TaxAmount, CostAmount
 
 TABLE: fact_inventory
 Columns: product_id, Plant, StorageLocation, plant_name, storage_location_name, event_date, product_name, current_stock, base_uom, total_sales_30d, revenue, lead_time_days, unit_cost, dead_stock_flag
@@ -16,6 +16,9 @@ Columns: product_id, event_date, product_name, revenue, cogs, gross_margin, tran
 
 TABLE: fact_cashflow
 Columns: CompanyCode, AccountingDocument, FiscalYear, AccountingDocumentItem, Customer, CustomerName, CompanyCodeName, GLAccount, GLAccountLongName, PostingDate, DocumentDate, NetDueDate, ClearingDate, CompanyCodeCurrency, Amount, ReceivableStatus, CashFlowType, AgingBucket, ActualCash, ForecastCash
+
+TABLE: fact_bom
+Columns: BillOfMaterialCategory, BillOfMaterial, BillOfMaterialVariant, BillOfMaterialItemNodeNumber, HeaderMaterial, Plant, PlantName, ComponentMaterial, ComponentDescription, BillOfMaterialItemNumber, BillOfMaterialItemUnit, BillOfMaterialItemQuantity, ValidityStartDate, ValidityEndDate, BOMItemRecordCreationDate
 """
 
 ML_MODEL_CARDS = """

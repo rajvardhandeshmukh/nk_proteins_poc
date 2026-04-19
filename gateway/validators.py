@@ -111,11 +111,13 @@ def validate_and_correct_params(intent: str, params: dict, template_config: dict
     corrected = {}
 
     for param_name, param_config in template_config.get("params", {}).items():
-        value = params.get(param_name, param_config["default"])
+        # Handle optional params without defaults
+        default_val = param_config.get("default")
+        value = params.get(param_name, default_val)
         expected_type = param_config["type"]
 
         # Type coercion
-        if expected_type == "int":
+        if expected_type == "int" and value is not None:
             try:
                 value = int(value)
             except (ValueError, TypeError):

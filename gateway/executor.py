@@ -108,7 +108,7 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
     # MOP-UP: Force Absolute Ground-Truth Reference
     # This bypasses any local synonyms or schema-shadowing causing discrepancies.
     query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
-    query = query.replace("fact_inventory", "[nk_proteins].[dbo].[fact_inventory]")
+    # fact_inventory uses dynamic resolution (synonyms)
     query = query.replace("fact_cashflow", "[nk_proteins].[dbo].[fact_cashflow]")
     
     # Schema Safety: Ensure legacy 'transaction_type' is always redirected to 'CashFlowType'
@@ -187,7 +187,7 @@ def execute_query(intent: str, params: dict) -> dict:
             result = {
                 "status": "success",
                 "intent": intent,
-                "data": df.to_dict(orient="records"),
+                "data": _df_to_json_safe_dict(df),
                 "row_count": len(df),
                 "query_ms": elapsed_ms,
             }
@@ -253,7 +253,7 @@ def execute_raw_sql(sql_query: str) -> dict:
             return {
                 "status": "success",
                 "intent": "dynamic_sql",
-                "data": df.to_dict(orient="records"),
+                "data": _df_to_json_safe_dict(df),
                 "row_count": len(df),
                 "query_ms": elapsed_ms,
             }
@@ -276,4 +276,26 @@ def execute_raw_sql(sql_query: str) -> dict:
     log_error(endpoint="/execute_raw_sql", error_type="db_failure", message=error_msg, context={"query": sql_query})
 
     return {"status": "error", "intent": "dynamic_sql", "message": error_msg, "data": [], "row_count": 0, "query_ms": elapsed_ms}
+
+
+def _df_to_json_safe_dict(df: pd.DataFrame) -> list:
+    """
+    Convert a dataframe to a list of records, ensuring dates/timestamps
+    are stringified for JSON serialization.
+    """
+    if df.empty:
+        return []
+    
+    # Work on a copy to avoid side effects
+    tmp = df.copy()
+    
+    # Convert datetime/Timestamp columns to strings
+    for col in tmp.columns:
+        if pd.api.types.is_datetime64_any_dtype(tmp[col]):
+            tmp[col] = tmp[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+            
+    # Handle NaN/Inf which are also not JSON serializable
+    tmp = tmp.astype(object).where(pd.notnull(tmp), None)
+    
+    return tmp.to_dict(orient="records")
 

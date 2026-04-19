@@ -80,47 +80,155 @@ INTENT_RULES = [
         "base_conf": 0.95,
     },
     {
-        "intent": "inventory_health",
-        "primary":   [["inventory", "warehouse health", "reorder"]],
-        "boosters":  [["warehouse", "depot"], ["health", "status", "report"]],
-        "base_conf": 0.82,
+        "intent": "reorder_alerts",
+        "primary":   [["reorder", "replenish", "urgently", "run out", "shortage", "out of stock"]],
+        "boosters":  [["product", "sku"], ["plant", "warehouse"]],
+        "base_conf": 0.95,
     },
+    # Financial / Audit grade profitability — uses fact_profitability (The Truth)
+    {
+        "intent": "business_profitability_summary",
+        "primary":   [["revenue", "sales", "profit", "margin", "cogs"], ["total", "overall", "aggregate", "summary", "company", "business", "sum", "how much", "how many"]],
+        "boosters":  [["gross", "performance"]],
+        "negative":  ["trending", "listing", "product", "sku", "itemized", "each", "per"],
+        "base_conf": 0.99,
+    },
+    {
+        "intent": "loss_making_summary",
+        "primary":   [["loss", "negative margin", "losing money", "unprofitable", "negative profit", "profit is negative", "not profitable"], ["how many", "count", "total", "summary", "number of"]],
+        "boosters":  [["aggregate", "overall", "profit", "sku"]],
+        "negative":  ["list", "which", "show individuals", "per product"],
+        "base_conf": 0.99,
+    },
+    {
+        "intent": "top_profitable_products",
+        "primary":   [["top", "ranking", "most profitable", "best margin", "worst margin", "bottom"]],
+        "boosters":  [["product", "sku", "profitable", "profit", "margin"], ["financial", "audit", "p&l"]],
+        "negative":  ["how many", "count", "total", "summary", "number of"],
+        "base_conf": 0.85,
+    },
+    {
+        "intent": "financial_margin_trend",
+        "primary":   [["margin trend", "profit trend", "monthly margin", "financial margin"]],
+        "boosters":  [["official", "audit", "month"], ["p&l", "pl"]],
+        "base_conf": 0.95,
+    },
+    # Operational estimate — uses fact_sales + inventory cost fallback
     {
         "intent": "worst_margins",
         "primary":   [["worst", "lowest", "negative"], ["margin", "profit"]],
         "boosters":  [["product"], ["region", "area"]],
-        "base_conf": 0.93,
+        "negative":  ["how many", "count", "total", "summary", "number of"],
+        "base_conf": 0.85,
     },
     {
         "intent": "region_comparison",
         "primary":   [["region", "area", "zone", "state"]],
         "boosters":  [["revenue", "sales", "perform", "compar"]],
+        "negative":  ["inventory", "stock", "valuation", "on-hand", "current stock"],
         "base_conf": 0.98,
     },
+    # Sales Performance — Strictly Revenue & Volume
     {
         "intent": "top_products",
-        "primary":   [["product", "item", "sku"], ["top", "best", "popular", "highest"]],
-        "boosters":  [["region", "area"], ["revenue", "sales"]],
-        "base_conf": 0.93,
+        "primary":   [["product", "item", "sku", "skus"], ["top", "best", "popular", "highest", "list", "rank", "show"]],
+        "boosters":  [["region", "area"], ["revenue", "sales", "volume"]],
+        "negative":  ["margin", "profit", "cogs", "loss", "tax"],
+        "base_conf": 0.96,
     },
-    # TIER 2 — Broad catch-all (lower base confidence)
     {
         "intent": "revenue_trend",
         "primary":   [["revenue", "sales", "trend", "growth"]],
         "boosters":  [["region", "area"], ["month", "quarter", "year"], ["product"]],
+        "negative":  ["margin", "profit", "cogs", "loss", "tax"],
         "base_conf": 0.85,
     },
     {
-        "intent": "cashflow_projection",
-        "primary":   [["cashflow", "cash flow", "receivable", "outstanding", "aging", "payment"]],
-        "boosters":  [["customer"], ["projection", "forecast", "status"]],
+        "intent": "sales_summary_30d",
+        "primary":   [["revenue", "sales", "volume"], ["30 days", "30-day", "30day", "30", "rolling", "recent"]],
+        "boosters":  [["total", "summary", "performance"]],
+        "negative":  ["margin", "profit", "cogs", "loss", "tax", "trend", "month"],
+        "base_conf": 0.98,
+    },
+    # TIER 1.5 — BOM & Production Structurals
+    {
+        "intent": "material_composition",
+        "primary":   [["bom", "composition", "recipe", "formulation", "what is it made of", "components", "ingredients"]],
+        "boosters":  [["product", "material"], ["list", "show"]],
         "base_conf": 0.95,
+    },
+    {
+        "intent": "bom_dependency_analysis",
+        "primary":   [["where is this used", "dependency", "finished goods using", "what is made from", "where did we use", "use", "used in", "consume"]],
+        "boosters":  [["material", "component"], ["list", "products"]],
+        "base_conf": 0.92,
+    },
+    {
+        "intent": "shortage_prediction",
+        "primary":   [["shortage", "prediction", "material needed", "production planning", "mrp", "do we have enough", "replenishment"]],
+        "boosters":  [["demand", "sales"], ["30 days", "forecast"]],
+        "base_conf": 0.90,
+    },
+    # Inventory & Stock Assets
+    {
+        "intent": "inventory_valuation_summary",
+        "primary":   [["inventory", "stock", "on-hand", "on hand"], ["value", "valuation", "cost", "asset"]],
+        "boosters":  [["all", "total", "summary"], ["current", "today"]],
+        "negative":  ["revenue", "sales", "sold"],
+        "base_conf": 0.98,
+    },
+    {
+        "intent": "inventory_health",
+        "primary":   [["inventory", "stock", "position", "on-hand", "on hand"], ["list", "show", "health", "dead", "status"]],
+        "boosters":  [["product", "sku"], ["plant", "location", "warehouse"]],
+        "negative":  ["revenue", "sales", "sold"],
+        "base_conf": 0.96,
+    },
+    # TIER 2 — Broad catch-all (lower base confidence)
+    # AR / FI grade intents — uses fact_cashflow (AR Ledger)
+    {
+        "intent": "aging_distribution",
+        "primary":   [["aging", "overdue", "aging bucket", "dso", "days overdue", "old invoices"]],
+        "boosters":  [["customer"], ["30", "60", "90", "days"]],
+        "base_conf": 0.97,
+    },
+    {
+        "intent": "outstanding_receivables",
+        "primary":   [["outstanding", "receivable", "unpaid", "pending payment", "not collected", "owed"]],
+        "boosters":  [["customer"], ["amount", "invoice"]],
+        "base_conf": 0.95,
+    },
+    {
+        "intent": "collection_efficiency",
+        "primary":   [["collection", "slow payer", "collection ratio", "bad payer", "payment performance"]],
+        "boosters":  [["customer"], ["efficiency", "ratio", "risk"]],
+        "base_conf": 0.95,
+    },
+    {
+        "intent": "product_profitability",
+        "primary":   [["revenue", "profit", "margin", "cogs"]],
+        "boosters":  [["product", "item", "sku", "listing"], ["performance", "ranking"]],
+        "negative":  ["aging", "receivable", "trend", "cashflow", "total", "overall", "aggregate", "summary", "company", "how many", "count", "number of", "summary"],
+        "base_conf": 0.85,
+    },
+    {
+        "intent": "loss_making_products",
+        "primary":   [["loss", "negative margin", "losing money", "unprofitable", "negative profit", "profit is negative", "not profitable"]],
+        "boosters":  [["list", "which", "who", "show", "profit"]],
+        "negative":  ["how many", "count", "total", "summary", "number of"],
+        "base_conf": 0.85,
     },
     {
         "intent": "whole_business_snapshot",
         "primary":   [["performance", "summary", "how is business", "whole business", "overall status", "dashboard"]],
         "boosters":  [["current", "today", "now", "status"]],
         "base_conf": 0.98,
+    },
+    {
+        "intent": "plant_footprint",
+        "primary":   [["plant", "distribution center", "dc", "depot", "locations", "warehouse", "sites"]],
+        "boosters":  [["how many", "list", "where", "total count", "geography"]],
+        "base_conf": 0.95,
     },
 ]
 
@@ -257,11 +365,15 @@ def _score_rule(text: str, rule: dict) -> float:
     Score how well a user's text matches a rule.
 
     Logic:
-    1. ALL primary keyword groups must have at least one hit.
-       If any primary group has zero hits → score = 0 (no match).
-    2. Each booster group that hits adds +0.02 to confidence.
-    3. Final confidence is clamped to [0, 1.0].
+    1. If any negative_keywords match → score = 0 (Pillar Exclusivity).
+    2. ALL primary keyword groups must have at least one hit.
+    3. Each booster group that hits adds +0.02 to confidence.
     """
+    # Pillar Exclusivity Check
+    if "negative" in rule:
+        if any(nk in text for nk in rule["negative"]):
+            return 0.0
+
     # Check primary groups — ALL must match
     for group in rule["primary"]:
         if not any(kw in text for kw in group):
@@ -295,6 +407,18 @@ def plan_query(user_input: str) -> dict:
         }
     """
     text = user_input.lower().strip()
+
+    # --- SQL Safeguard: If the query looks like raw SQL, drop confidence to force dynamic mode ---
+    # This prevents rule-based templates from clobbering agent-generated SQL.
+    if text.startswith(("select ", "with ", "show ", "insert ", "update ", "delete ")):
+        logger.info("Raw SQL detected in input. Forcing dynamic mode fallback.")
+        return {
+            "intent": "unknown",
+            "params": {},
+            "mode": "dynamic",
+            "confidence": 0.0,
+            "original_query": user_input
+        }
 
     # --- Score all rules ---
     scored = []
@@ -335,15 +459,48 @@ def plan_query(user_input: str) -> dict:
     months = _extract_months(text)
     limit = _extract_limit(text)
 
+    # --- Extract IDs (Digital material codes) ---
+    # Common pattern for NK Proteins IDs (6-18 digits, avoiding short counts or years)
+    id_match = re.search(r'\b(\d{6,18})\b', text)
+    if id_match:
+        product_id = id_match.group(1)
+
     params = {}
 
     # Intent-specific param assembly
-    if best_intent in ("revenue_trend",):
+    if best_intent in ("material_composition", "shortage_prediction"):
+        if product_id:
+            params["product_id"] = product_id
+        if product:  # Fallback to name if ID not found
+            params["product_name"] = product
+
+    elif best_intent in ("bom_dependency_analysis",):
+        if product_id:
+            params["material_id"] = product_id
+        if product:
+             params["material_name"] = product
+
+    elif best_intent in ("revenue_trend",):
         params["months_back"] = months
+        if date_context["month"]:
+            params["month"] = date_context["month"]
+        if date_context["year"]:
+            params["year"] = date_context["year"]
         if region:
             params["region"] = region
         if product:
             params["product"] = product
+
+    elif best_intent in ("product_profitability", "top_profitable_products", "loss_making_products", "financial_margin_trend"):
+        params["limit"] = limit
+        if date_context["month"]:
+            params["month"] = date_context["month"]
+        if date_context["year"]:
+            params["year"] = date_context["year"]
+        if product:
+            params["product"] = product
+        if region:
+            params["region"] = region
 
     elif best_intent in ("top_products", "top_customers", "worst_margins"):
         params["limit"] = limit
@@ -371,8 +528,10 @@ def plan_query(user_input: str) -> dict:
 
     elif best_intent in ("region_comparison",):
         params["months_back"] = months
-        if date_context["month"] and date_context["year"]:
-            params["month"] = f"{date_context['year']}-{date_context['month']:02d}"
+        if date_context["month"]:
+            params["month"] = date_context["month"]
+        if date_context["year"]:
+            params["year"] = date_context["year"]
 
     elif best_intent in ("gst_mismatch",):
         params["limit"] = limit
@@ -399,8 +558,10 @@ def plan_query(user_input: str) -> dict:
             "Staying in template mode with hardened v3 filtering.",
             date_context["month"], date_context["year"]
         )
-        if date_context["month"] and date_context["year"]:
-            params["month"] = f"{date_context['year']}-{date_context['month']:02d}"
+        if date_context["month"]:
+            params["month"] = date_context["month"]
+        if date_context["year"]:
+            params["year"] = date_context["year"]
 
     return {
         "intent": best_intent,
