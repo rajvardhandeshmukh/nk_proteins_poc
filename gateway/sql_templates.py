@@ -35,6 +35,33 @@ SALES PILLAR — BUSINESS LOGIC CHARTER (from SAP Z_C_NKP_SALES_FORECAST view)
 SQL_TEMPLATES = {
 
     # =========================================================================
+    # 10. BILL OF MATERIALS (BOM) LOOKUP
+    # =========================================================================
+    "bom_lookup": {
+        "description": "Lookup components, ingredients, and quantities for a parent product (HeaderMaterial).",
+        "table": "fact_bom",
+        "query": """
+            SELECT 
+                HeaderMaterial,
+                ComponentMaterial,
+                ComponentDescription,
+                BillOfMaterialItemQuantity AS quantity,
+                BillOfMaterialItemUnit AS unit,
+                Plant,
+                PlantName,
+                ValidityStartDate,
+                ValidityEndDate
+            FROM fact_bom
+            WHERE HeaderMaterial = :product
+            ORDER BY BillOfMaterialItemNumber ASC
+        """,
+        "params": {
+            "product": {"type": "str"},
+        },
+        "optional_filters": {},
+    },
+
+    # =========================================================================
     # 1. REVENUE TREND
     # Business: revenue = Net Sales (post-discount, pre-tax). Trends are
     #           valid. Returns are NOT subtracted — narrate the caveat.

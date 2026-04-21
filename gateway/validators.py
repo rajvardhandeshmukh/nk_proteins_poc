@@ -111,9 +111,15 @@ def validate_and_correct_params(intent: str, params: dict, template_config: dict
     corrected = {}
 
     for param_name, param_config in template_config.get("params", {}).items():
-        # Handle optional params without defaults
-        default_val = param_config.get("default")
-        value = params.get(param_name, default_val)
+        # Safely get value or default
+        if param_name in params:
+            value = params[param_name]
+        elif "default" in param_config:
+            value = param_config["default"]
+        else:
+            # Required parameter missing
+            raise ValueError(f"Missing required parameter: '{param_name}'")
+
         expected_type = param_config["type"]
 
         # Type coercion

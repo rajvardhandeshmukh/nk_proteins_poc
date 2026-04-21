@@ -95,8 +95,6 @@ def call_granite(
             GenParams.MAX_NEW_TOKENS: max_tokens,
             GenParams.TEMPERATURE: temperature,
         }
-        if is_json:
-            params[GenParams.STOP_SEQUENCES] = ["}"]
 
         model = ModelInference(
             model_id=model_id,

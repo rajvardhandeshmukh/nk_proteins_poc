@@ -184,6 +184,10 @@ def execute_query(intent: str, params: dict) -> dict:
                     if params[p_name] != clean_corrected:
                         corrections[p_name] = {"original": params[p_name], "corrected": clean_corrected}
 
+            # Ensure JSON serializability (convert Timestamps to strings)
+            for col in df.select_dtypes(include=['datetime', 'datetimetz']).columns:
+                df[col] = df[col].dt.strftime('%Y-%m-%d')
+
             result = {
                 "status": "success",
                 "intent": intent,

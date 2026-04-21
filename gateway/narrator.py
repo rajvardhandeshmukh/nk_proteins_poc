@@ -121,6 +121,13 @@ def narrate(plan: dict, data: dict) -> str:
             "If the count is > 0, use a professional but alert tone. "
             "Format as a Risk Exposure Summary. Use ₹ symbol."
         )
+    elif intent == "bom_lookup":
+        sys_prompt = (
+            "You are a Production Analyst for NK Proteins. The user is asking for the Bill of Materials (BOM) or Recipe of a product. "
+            "Present the data as a clean Markdown table with these columns: Component Material, Description, Quantity, Unit. "
+            "Start with a single sentence stating the Parent Material (HeaderMaterial) being analyzed. "
+            "If multiple plants or variants are present, group them clearly."
+        )
     else:
         sys_prompt = (
             "You are an elite Business Analyst for NK Proteins. Summarize the provided data. "
@@ -140,7 +147,7 @@ def narrate(plan: dict, data: dict) -> str:
     regional_totals = {}
     total_for_audit = 0
     
-    if intent != "whole_business_snapshot":
+    if intent not in ("whole_business_snapshot", "bom_lookup"):
         for r in rows:
             reg = r.get("region", "Global")
             rev = _extract_revenue(r)
@@ -155,6 +162,13 @@ def narrate(plan: dict, data: dict) -> str:
             f"\nRaw Data (rows: {row_count}):\n"
             f"```json\n{json.dumps(rows[:15], indent=2)}\n```\n"
             "Executive Summary:"
+        )
+    elif intent == "bom_lookup":
+        user_prompt = (
+            f"Context: Bill of Materials lookup.\n"
+            f"Raw Data (rows: {row_count}):\n"
+            f"```json\n{json.dumps(rows, indent=2)}\n```\n"
+            "BOM Analysis:"
         )
     else:
         # Dashboard context

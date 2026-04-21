@@ -230,6 +230,12 @@ INTENT_RULES = [
         "boosters":  [["how many", "list", "where", "total count", "geography"]],
         "base_conf": 0.95,
     },
+    {
+        "intent": "bom_lookup",
+        "primary":   [["bom", "bill of material", "recipe", "ingredients", "components", "made of"]],
+        "boosters":  [["product", "material", "item"]],
+        "base_conf": 0.96,
+    },
 ]
 
 
@@ -342,14 +348,20 @@ def _extract_warehouse(text: str):
 
 
 def _extract_product(text: str):
-    # Priority 1: Check for full known product prefixes (like SUNPRIDE)
+    # Priority 1: Check for long numeric Material IDs (SAP-style)
+    # These are typically 10-18 digits in enterprise systems.
+    id_match = re.search(r'(\d{10,18})', text)
+    if id_match:
+        return id_match.group(1)
+
+    # Priority 2: Check for full known product prefixes (like SUNPRIDE)
     if "sunprime" in text or "sunpride" in text:
         # Try to find the whole segment
         match = re.search(r'(sunpride\s+[a-z0-9\s]+(?:nt|ltr|kg))', text)
         if match:
             return match.group(1).upper()
             
-    # Priority 2: Keyword fallback
+    # Priority 3: Keyword fallback
     for keyword, value in PRODUCT_KEYWORDS.items():
         if keyword in text:
             return value
@@ -535,6 +547,12 @@ def plan_query(user_input: str) -> dict:
 
     elif best_intent in ("gst_mismatch",):
         params["limit"] = limit
+
+    elif best_intent in ("bom_lookup",):
+        if product:
+            params["product"] = product
+        # If no product found but intent is strong, we might rely on dynamic fallback
+        # or prompt for input, but here we set whatever is found.
 
     # gst_summary has no params
 
