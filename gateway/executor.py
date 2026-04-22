@@ -87,7 +87,12 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
         return query.strip(), params
 
     if intent not in sql_templates.SQL_TEMPLATES:
-        raise ValueError(f"Unknown intent: '{intent}'. Valid: {sql_templates.VALID_INTENTS}")
+        # If it's the specific V2 'unknown' intent, provide a clean message
+        if intent == "unknown":
+            raise ValueError("This query is not yet supported in the standardized V2 Sales Mode.")
+        # Otherwise, fall back to listing only the V2 intents if possible
+        valid_v2 = list(sql_templates_v2.SQL_TEMPLATES.keys())
+        raise ValueError(f"Intent '{intent}' not recognized. Standardized V2 reports available: {valid_v2}")
 
     template = sql_templates.SQL_TEMPLATES[intent]
 
