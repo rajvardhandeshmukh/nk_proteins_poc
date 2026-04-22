@@ -24,7 +24,19 @@ SQL_TEMPLATES = {
         ORDER BY [Revenue (INR)] DESC;
     """,
     
-    "top_products_revenue": """
+    "top_products_overall": """
+        -- Global Revenue Ranking (Ignores units as revenue is additive)
+        SELECT TOP 10 
+               Material,
+               ProductName,
+               SUM(NetAmount) AS [Revenue (INR)]
+        FROM fact_sales
+        GROUP BY Material, ProductName
+        ORDER BY [Revenue (INR)] DESC;
+    """,
+    
+    "top_products_revenue_unit_safe": """
+        -- Demand View (Strictly separated by unit)
         SELECT TOP 10 Material, 
                ProductName, 
                BillingQuantityUnit AS [Unit],
@@ -43,7 +55,7 @@ SQL_TEMPLATES = {
                SUM(BillingQuantity) AS [Total Quantity]
         FROM fact_sales
         GROUP BY Material, ProductName, BillingQuantityUnit
-        ORDER BY [Revenue (INR)] DESC;
+        ORDER BY [Revenue (INR)] DESC, [Total Quantity] DESC;
     """,
     
     "profitability_all": """
@@ -53,21 +65,22 @@ SQL_TEMPLATES = {
     """,
     
     "profitability_valid": """
-       SELECT 
-    SUM(NetAmount - CostAmount) AS [Gross Margin (Valid)],
-    COUNT(*) AS [Rows Used]
-    FROM fact_sales
-    WHERE CostAmount > 0;
+        -- Analyzes only rows where CostAmount is available
+        SELECT 
+            SUM(NetAmount - CostAmount) AS [Gross Margin (Valid)],
+            COUNT(*) AS [Rows Used],
+            SUM(NetAmount) AS [Revenue Covered]
+        FROM fact_sales
+        WHERE CostAmount > 0;
     """,
     
     "monthly_revenue_trend": """
         SELECT 
-    YEAR(BillingDocumentDate) AS [Year],
-    MONTH(BillingDocumentDate) AS [Month],
-    SUM(NetAmount) AS [Revenue (INR)]
-FROM fact_sales
-GROUP BY YEAR(BillingDocumentDate), MONTH(BillingDocumentDate)
-ORDER BY [Year], [Month];
+            CONCAT(YEAR(BillingDocumentDate), '-', RIGHT('0' + CAST(MONTH(BillingDocumentDate) AS VARCHAR), 2)) AS [Year-Month],
+            SUM(NetAmount) AS [Revenue (INR)]
+        FROM fact_sales
+        GROUP BY YEAR(BillingDocumentDate), MONTH(BillingDocumentDate)
+        ORDER BY [Year-Month];
     """,
     
     "daily_revenue_trend": """

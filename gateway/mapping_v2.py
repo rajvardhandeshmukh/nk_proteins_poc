@@ -16,9 +16,13 @@ INTENT_MAP = {
         "plant city revenue", "fulfillment revenue",
         "plant", "by plant", "plant-wise"
     ],
-    "top_products_revenue": [
+    "top_products_overall": [
+        "top products overall", "global top products", "best sellers total",
+        "top revenue products", "all units top products"
+    ],
+    "top_products_revenue_unit_safe": [
         "top products", "best selling products", "most revenue product",
-        "highest revenue items", "top 10 products"
+        "product ranking", "top selling materials", "top sellers", "top materials"
     ],
     "product_performance_detailed": [
         "product performance", "detailed product sales", "product quantity",
