@@ -89,8 +89,8 @@ SQL_TEMPLATES = {
             ORDER BY yr, mo
         """,
         "params": {
-            "month": {"type": "int", "optional": True},
-            "year": {"type": "int", "optional": True},
+            "month": {"type": "int", "default": None},
+            "year": {"type": "int", "default": None},
         },
         "optional_filters": {
             # region comes from Customer record in SAP — correct for demand analytics
@@ -144,8 +144,8 @@ SQL_TEMPLATES = {
         """,
         "params": {
             "limit": {"type": "int", "default": 10, "max": 50},
-            "month": {"type": "int", "optional": True},
-            "year": {"type": "int", "optional": True},
+            "month": {"type": "int", "default": None},
+            "year": {"type": "int", "default": None},
         },
         "optional_filters": {
             "region_filter": "AND region = :region",
@@ -170,9 +170,8 @@ SQL_TEMPLATES = {
             SELECT TOP (:limit)
                 product_id,
                 product_name,
-                Plant,
                 StorageLocation,
-                storage_location_name,
+                location_name,
                 current_stock,
                 base_uom,
                 current_stock * unit_cost                           AS inventory_value,
@@ -217,7 +216,7 @@ SQL_TEMPLATES = {
                 product_name,
                 Plant,
                 StorageLocation,
-                storage_location_name,
+                location_name,
                 base_uom,
                 current_stock,
                 unit_cost,
@@ -263,7 +262,7 @@ SQL_TEMPLATES = {
                 product_id,
                 product_name,
                 Plant,
-                storage_location_name,
+                location_name,
                 base_uom,
                 current_stock,
                 ROUND(total_sales_30d / 30.0, 2)                                    AS daily_sales,
@@ -523,29 +522,28 @@ SQL_TEMPLATES = {
     # Business: ORDER BY gross_margin DESC — official ranking for P&L review
     # =========================================================================
     "top_profitable_products": {
-        "description": "[FINANCIAL/AUDIT] Official product profitability ranking by gross margin. Source: fact_profitability.",
-        "table": "fact_profitability",
+        "description": "[FINANCIAL/AUDIT] Profitability ranking based on Pure Sales Math. Revenue/Qty from fact_sales, Cost from fact_inventory avg(unit_cost).",
+        "table": "fact_sales + fact_inventory",
         "query": """
             SELECT TOP (:limit)
                 product_id,
                 product_name,
-                SUM(revenue)        AS total_net_revenue,
-                SUM(cogs)           AS total_cogs,
-                SUM(gross_margin)   AS total_gross_margin,
-                ROUND(SUM(gross_margin) / NULLIF(SUM(revenue), 0) * 100, 2) AS margin_pct
-            FROM fact_profitability
+                SUM(revenue)                                AS total_net_revenue,
+                SUM(CostAmount)                             AS total_cogs,
+                SUM(revenue - CostAmount)                   AS total_gross_margin,
+                ROUND(SUM(revenue - CostAmount) / NULLIF(SUM(revenue), 0) * 100, 2) AS margin_pct
+            FROM fact_sales
             WHERE 1=1
             {month_filter}
             {year_filter}
             {product_filter}
-            AND cogs > 0
             GROUP BY product_id, product_name
-            ORDER BY total_gross_margin DESC
+            ORDER BY total_net_revenue DESC
         """,
         "params": {
             "limit": {"type": "int", "default": 20, "max": 100},
-            "month": {"type": "int", "optional": True},
-            "year": {"type": "int", "optional": True},
+            "month": {"type": "int", "default": None},
+            "year": {"type": "int", "default": None},
         },
         "optional_filters": {
             "product_filter": "AND product_name LIKE :product",
@@ -576,9 +574,9 @@ SQL_TEMPLATES = {
         "table": "fact_cashflow",
         "query": """
             SELECT
-                YEAR(TRY_CAST(PostingDate AS DATE))                AS yr,
-                MONTH(TRY_CAST(PostingDate AS DATE))               AS mo,
-                FORMAT(TRY_CAST(PostingDate AS DATE), 'MMM yyyy')  AS month_label,
+                YEAR(PostingDate)                AS yr,
+                MONTH(PostingDate)               AS mo,
+                FORMAT(PostingDate, 'MMM yyyy')  AS month_label,
                 -- Realized: money already collected
                 SUM(ActualCash)                                    AS realized_cash,
                 -- Outstanding: money still owed by customers
@@ -595,9 +593,9 @@ SQL_TEMPLATES = {
             FROM fact_cashflow
             WHERE TRY_CAST(PostingDate AS DATE) BETWEEN '2025-01-01' AND '2025-03-31'
             GROUP BY
-                YEAR(TRY_CAST(PostingDate AS DATE)),
-                MONTH(TRY_CAST(PostingDate AS DATE)),
-                FORMAT(TRY_CAST(PostingDate AS DATE), 'MMM yyyy')
+                YEAR(PostingDate),
+                MONTH(PostingDate),
+                FORMAT(PostingDate, 'MMM yyyy')
             ORDER BY yr, mo
         """,
         "params": {},

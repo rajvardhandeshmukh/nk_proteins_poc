@@ -21,8 +21,8 @@ from urllib.parse import quote_plus
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 
-from .sql_templates import SQL_TEMPLATES, VALID_INTENTS
-from .validators import validate_and_correct_params, PARAM_TO_CATEGORY, fuzzy_match
+from . import sql_templates
+from . import validators
 from .telemetry import log_query, log_error
 
 logger = logging.getLogger(__name__)
@@ -77,13 +77,13 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
     Takes an intent name and user params.
     Returns (filled_sql_string, safe_params_dict).
     """
-    if intent not in SQL_TEMPLATES:
-        raise ValueError(f"Unknown intent: '{intent}'. Valid: {VALID_INTENTS}")
+    if intent not in sql_templates.SQL_TEMPLATES:
+        raise ValueError(f"Unknown intent: '{intent}'. Valid: {sql_templates.VALID_INTENTS}")
 
-    template = SQL_TEMPLATES[intent]
+    template = sql_templates.SQL_TEMPLATES[intent]
 
     # Step 1: Validate types + fuzzy-correct entity names
-    safe_params = validate_and_correct_params(intent, params, template)
+    safe_params = validators.validate_and_correct_params(intent, params, template)
 
     # Step 2: Build the query string
     query = template["query"]
@@ -106,13 +106,12 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
             query = query.replace(f"{{{filter_key}}}", "")
 
     # MOP-UP: Force Absolute Ground-Truth Reference
-    # This bypasses any local synonyms or schema-shadowing causing discrepancies.
+    # Since we rebuilt fact tables from scratch, we use the normalized base tables.
     query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
-    # fact_inventory uses dynamic resolution (synonyms)
+    query = query.replace("fact_inventory", "[nk_proteins].[dbo].[fact_inventory]")
     query = query.replace("fact_cashflow", "[nk_proteins].[dbo].[fact_cashflow]")
-    
-    # Schema Safety: Ensure legacy 'transaction_type' is always redirected to 'CashFlowType'
-    query = query.replace("transaction_type", "CashFlowType")
+    query = query.replace("fact_profitability", "[nk_proteins].[dbo].[fact_profitability]")
+    query = query.replace("fact_bom", "[nk_proteins].[dbo].[fact_bom]")
 
     return query.strip(), safe_params
 
@@ -178,7 +177,7 @@ def execute_query(intent: str, params: dict) -> dict:
 
             # 4. Build response with corrections metadata
             corrections = {}
-            for p_name in PARAM_TO_CATEGORY:
+            for p_name in validators.PARAM_TO_CATEGORY:
                 if p_name in params and p_name in safe_params and params[p_name] != safe_params.get(p_name, "").replace("%", ""):
                     clean_corrected = safe_params[p_name].replace("%", "")
                     if params[p_name] != clean_corrected:

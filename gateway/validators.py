@@ -49,7 +49,7 @@ def load_entity_cache():
                     pd.read_sql("SELECT DISTINCT product_name FROM fact_sales", conn)["product_name"].dropna()
                 ),
                 "warehouse": set(
-                    pd.read_sql("SELECT DISTINCT plant_name FROM fact_inventory", conn)["plant_name"].dropna()
+                    pd.read_sql("SELECT DISTINCT location_name FROM fact_inventory", conn)["location_name"].dropna()
                 ),
             }
         total = sum(len(v) for v in ENTITY_CACHE.values())
