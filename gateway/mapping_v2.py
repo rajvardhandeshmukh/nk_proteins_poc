@@ -27,6 +27,7 @@ INTENT_MAP = {
         "which region has most revenue", "demand by region", "customer region"
     ],
     "revenue_by_plant": [
+        "total revenue broken down by plant", "revenue broken down by plant",
         "revenue by plant", "sales by plant", "supply point sales",
         "plant city revenue", "fulfillment revenue"
     ],
@@ -36,7 +37,8 @@ INTENT_MAP = {
     ],
     "top_products_revenue_unit_safe": [
         "top products", "best selling products", "most revenue product",
-        "product ranking", "top selling materials", "top sellers", "top materials"
+        "product ranking", "top selling materials", "top sellers", "top materials",
+        "top 10 products", "top 10 products by revenue", "highest revenue items"
     ],
     "revenue_by_region_product": [
         "top products by region", "best products in each region", 
