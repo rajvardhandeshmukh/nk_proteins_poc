@@ -21,7 +21,9 @@ from urllib.parse import quote_plus
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 
+import importlib
 from . import sql_templates
+from . import sql_templates_v2
 from . import validators
 from .telemetry import log_query, log_error
 
@@ -77,6 +79,14 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
     Takes an intent name and user params.
     Returns (filled_sql_string, safe_params_dict).
     """
+    # [POC V2 BYPASS] Check V2 Templates FIRST
+    if hasattr(sql_templates_v2, 'SQL_TEMPLATES') and intent in sql_templates_v2.SQL_TEMPLATES:
+        template = sql_templates_v2.SQL_TEMPLATES[intent]
+        query = template["query"]
+        # Direct Ground-Truth Reference
+        query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
+        return query.strip(), params
+
     if intent not in sql_templates.SQL_TEMPLATES:
         raise ValueError(f"Unknown intent: '{intent}'. Valid: {sql_templates.VALID_INTENTS}")
 
@@ -131,10 +141,11 @@ def execute_query(intent: str, params: dict) -> dict:
     Output: {"status": "success", "data": [...], "row_count": N, "query_ms": M}
     """
     start = time.time()
-    # FORCE RELOAD
+    # FORCE RELOAD BOTH TEMplate LIBRARIES
     import importlib
-    from . import sql_templates
+    from . import sql_templates, sql_templates_v2
     importlib.reload(sql_templates)
+    importlib.reload(sql_templates_v2)
 
     # 1. Build the safe query (validates types + fuzzy corrections)
     try:

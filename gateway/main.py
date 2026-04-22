@@ -26,6 +26,7 @@ from .llm_planner import plan_query_llm
 from .llm_sql import generate_sql_dynamic
 from .narrator import narrate
 from .sql_templates import SQL_TEMPLATES, VALID_INTENTS
+from .mapping_v2 import get_intent as get_v2_intent
 from .validators import load_entity_cache
 from .telemetry import log_error, log_plan, log_narration
 from .governance import get_reliability, get_governance_notes, detect_conflicts, ReliabilityLevel
@@ -141,6 +142,27 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
     print(f"[*] INCOMING REQUEST FROM ORCHESTRATE")
     print(f"[*] PAYLOAD: {request.dict()}")
     print("=" * 30 + "\n")
+
+    # [POC V2 BYPASS] Pure Sales Math Fast Path
+    v2_match = get_v2_intent(request.query)
+    if v2_match:
+        print(f"!!! [POC V2 BYPASS] Matched to V2 Intent: {v2_match['intent']}")
+        v2_intent = v2_match["intent"]
+        v2_params = v2_match["params"]
+        
+        # Execute V2 (Fast Track)
+        v2_data = execute_query(intent=v2_intent, params=v2_params)
+        
+        # Narrate V2
+        v2_answer = narrate({"intent": v2_intent, "params": v2_params}, v2_data)
+        
+        pipeline_ms = round((time.time() - pipeline_start) * 1000)
+        return FullResponse(
+            plan=PlanResponse(intent=v2_intent, params=v2_params, mode="v2_pure_math", confidence=1.0, reliability_level=ReliabilityLevel.HIGH, original_query=request.query),
+            data=v2_data,
+            answer=f"[POC V2 PURE MATH]\n\n{v2_answer}",
+            pipeline_ms=pipeline_ms
+        )
 
     try:
         # Step 1: Plan (with confidence scoring)
