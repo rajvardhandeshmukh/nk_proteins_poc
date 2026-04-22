@@ -81,8 +81,7 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
     """
     # [POC V2 BYPASS] Check V2 Templates FIRST
     if hasattr(sql_templates_v2, 'SQL_TEMPLATES') and intent in sql_templates_v2.SQL_TEMPLATES:
-        template = sql_templates_v2.SQL_TEMPLATES[intent]
-        query = template["query"]
+        query = sql_templates_v2.SQL_TEMPLATES[intent]
         # Direct Ground-Truth Reference
         query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
         return query.strip(), params
@@ -297,19 +296,28 @@ def _df_to_json_safe_dict(df: pd.DataFrame) -> list:
     Convert a dataframe to a list of records, ensuring dates/timestamps
     are stringified for JSON serialization.
     """
+    import datetime
+    from decimal import Decimal
+
     if df.empty:
         return []
     
     # Work on a copy to avoid side effects
     tmp = df.copy()
     
-    # Convert datetime/Timestamp columns to strings
-    for col in tmp.columns:
-        if pd.api.types.is_datetime64_any_dtype(tmp[col]):
-            tmp[col] = tmp[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-            
-    # Handle NaN/Inf which are also not JSON serializable
+    # Handle NaN/Inf first
     tmp = tmp.astype(object).where(pd.notnull(tmp), None)
     
-    return tmp.to_dict(orient="records")
+    # Convert to records
+    records = tmp.to_dict(orient="records")
+    
+    # Final pass to catch any date/datetime/decimal objects hidden in object columns
+    for row in records:
+        for key, val in row.items():
+            if isinstance(val, (datetime.date, datetime.datetime)):
+                row[key] = val.isoformat()
+            elif isinstance(val, Decimal):
+                row[key] = float(val)
+                
+    return records
 

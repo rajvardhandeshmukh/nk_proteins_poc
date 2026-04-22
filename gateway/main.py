@@ -143,126 +143,37 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
     print(f"[*] PAYLOAD: {request.dict()}")
     print("=" * 30 + "\n")
 
-    # [POC V2 BYPASS] Pure Sales Math Fast Path
-    v2_match = get_v2_intent(request.query)
-    if v2_match:
-        print(f"!!! [POC V2 BYPASS] Matched to V2 Intent: {v2_match['intent']}")
-        v2_intent = v2_match["intent"]
-        v2_params = v2_match["params"]
-        
-        # Execute V2 (Fast Track)
-        v2_data = execute_query(intent=v2_intent, params=v2_params)
-        
-        # Narrate V2
-        v2_answer = narrate({"intent": v2_intent, "params": v2_params}, v2_data)
-        
-        pipeline_ms = round((time.time() - pipeline_start) * 1000)
-        return FullResponse(
-            plan=PlanResponse(intent=v2_intent, params=v2_params, mode="v2_pure_math", confidence=1.0, reliability_level=ReliabilityLevel.HIGH, original_query=request.query),
-            data=v2_data,
-            answer=f"[POC V2 PURE MATH]\n\n{v2_answer}",
-            pipeline_ms=pipeline_ms
-        )
-
     try:
-        # Step 1: Plan (with confidence scoring)
-        plan_dict = plan_query(request.query)
-        confidence = plan_dict.get("confidence", 0.0)
-        
-        # Step 1B: LLM Planner Fallback
-        if plan_dict.get("mode") == "dynamic" or confidence < 0.70:
-            logger.info(f"Low confidence ({confidence}) or dynamic mode. Falling back to LLM Planner.")
-            plan_dict = plan_query_llm(request.query)
-
-        # Step 1C: Reliability & Governance Mapping
-        plan_dict["reliability_level"] = get_reliability(plan_dict["intent"])
-        plan = PlanResponse(**plan_dict)
-
-        log_plan(
-            user_question=request.query,
-            extracted_intent=plan.intent,
-            extracted_params=plan.params,
-            confidence=confidence,
-        )
-
-        # TERMINAL LOGGING: Visual Audit of identified strategy
-        print("\n" + "="*50)
-        print(f"[*] QUERY IDENTIFIED: {plan.intent if plan.intent else 'DYNAMIC_GENERATION'}")
-        print(f"[*] RELIABILITY TIER: {plan.reliability_level}")
-        print(f"[*] PARAMS EXTRACTED: {plan.params}")
-        print(f"[*] USER QUESTION:    {request.query}")
-        print("="*50 + "\n")
-
-        # Step 2: Execute
-        if plan.mode == "template":
-            data = execute_query(intent=plan.intent, params=plan.params)
-        else:
-            # Step 2B: LLM SQL Generation Fallback
-            logger.info({
-                "mode": "dynamic",
-                "reason": "low_confidence_or_dynamic",
-                "query": request.query
-            })
-            sql_info = generate_sql_dynamic(request.query)
-            if sql_info["status"] == "error":
-                logger.error(f"Dynamic SQL Generation Failed: {sql_info['error']}")
-                raise HTTPException(
-                    status_code=500, 
-                    detail=f"I couldn't run this dynamic query safely. Error: {sql_info['error']}"
-                )
-            else:
-                # Validate and execute
-                data = execute_raw_sql(sql_info["sql"])
-                if data["status"] == "error":
-                    logger.error(f"Query execution failed: {data['message']}")
-                    raise HTTPException(
-                        status_code=500, 
-                        detail=f"Query execution failed!: {data['message']}"
-                    )
-                # GUARDRAIL: If dynamic SQL returned zero rows, say so explicitly.
-                if data.get("row_count", 0) == 0:
-                    pipeline_ms = round((time.time() - pipeline_start) * 1000)
-                    return FullResponse(
-                        plan=plan,
-                        data=data,
-                        answer="No data available for the specified criteria. Try broadening your filters or time range.",
-                        pipeline_ms=pipeline_ms,
-                    )
-
-        # Step 3: Narrate
-        narration_start = time.time()
-        # Pass governance context to creator
-        gov_notes = get_governance_notes(plan.intent, data)
-        conflicts = detect_conflicts(data.get("data", [{}])[0] if data.get("data") else {})
-        
-        answer = narrate(plan_dict, data)
-        narration_ms = round((time.time() - narration_start) * 1000)
-
-        # Prepend reliability and notes to answer
-        header = f"[{plan.reliability_level.value} RELIABILITY]"
-        if gov_notes:
-            header += f"\nGovernance Notes: {', '.join(gov_notes)}"
-        if conflicts:
-            header += f"\n!!! CONFLICT DETECTED: {', '.join(conflicts)}"
+        # [POC V2 BYPASS] Pure Sales Math Fast Path
+        v2_match = get_v2_intent(request.query)
+        if v2_match:
+            print(f"!!! [POC V2 BYPASS] Matched to V2 Intent: {v2_match['intent']}")
+            v2_intent = v2_match["intent"]
+            v2_params = v2_match["params"]
             
-        answer = f"{header}\n\n{answer}"
-
-        log_narration(
-            intent=plan.intent,
-            input_row_count=data.get("row_count", 0),
-            output_length=len(answer),
-            latency_ms=narration_ms,
-        )
-
-        pipeline_ms = round((time.time() - pipeline_start) * 1000)
-        return FullResponse(
-            plan=plan,
-            data=data,
-            answer=answer,
-            governance_notes=gov_notes,
-            conflict_flags=conflicts,
-            pipeline_ms=pipeline_ms,
-        )
+            # Execute V2 (Fast Track)
+            v2_data = execute_query(intent=v2_intent, params=v2_params)
+            
+            # Narrate V2
+            v2_answer = narrate({"intent": v2_intent, "params": v2_params}, v2_data)
+            
+            pipeline_ms = round((time.time() - pipeline_start) * 1000)
+            return FullResponse(
+                plan=PlanResponse(intent=v2_intent, params=v2_params, mode="v2_pure_math", confidence=1.0, reliability_level=ReliabilityLevel.HIGH, original_query=request.query),
+                data=v2_data,
+                answer=f"[POC V2 PURE MATH]\n\n{v2_answer}",
+                pipeline_ms=pipeline_ms
+            )
+        else:
+            # User requested to bypass advanced intelligence completely.
+            # If no V2 match, we return an error rather than falling back to LLM.
+            pipeline_ms = round((time.time() - pipeline_start) * 1000)
+            return FullResponse(
+                plan=PlanResponse(intent="unsupported", params={}, mode="v2_pure_math", confidence=0.0, reliability_level=ReliabilityLevel.LOW, original_query=request.query),
+                data={"status": "error", "message": "Query not supported in pure V2 mode."},
+                answer="I am currently in 'Pure Sales Mode' and can only answer predefined queries about revenue, regions, monthly trends, and top products. Please try rephrasing or ask about 'total revenue'.",
+                pipeline_ms=pipeline_ms
+            )
 
     except Exception as e:
         logger.error(f"FATAL PIPELINE CRASH: {str(e)}", exc_info=True)
@@ -276,8 +187,8 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
         pipeline_ms = round((time.time() - pipeline_start) * 1000)
         
         # Determine if we even have a plan/data to return
-        p = plan if 'plan' in locals() else PlanResponse(intent="error", original_query=request.query)
-        d = data if 'data' in locals() else {"status": "error", "message": str(e), "data": [], "row_count": 0}
+        p = PlanResponse(intent="error", original_query=request.query)
+        d = {"status": "error", "message": str(e), "data": [], "row_count": 0}
         
         # Distinguish between network errors and logic errors
         if "granite_network_error" in str(e).lower() or "connection" in str(e).lower():
