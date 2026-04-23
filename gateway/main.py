@@ -146,7 +146,7 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
     try:
         # [POC V2 BYPASS] Pure Sales Math Fast Path
         v2_match = get_v2_intent(request.query)
-        if v2_match:
+        if v2_match and v2_match.get("intent") != "unknown":
             print(f"!!! [POC V2 BYPASS] Matched to V2 Intent: {v2_match['intent']}")
             v2_intent = v2_match["intent"]
             v2_params = v2_match["params"]
