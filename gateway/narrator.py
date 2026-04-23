@@ -5,7 +5,16 @@ from .llm_client import call_granite
 logger = logging.getLogger(__name__)
 
 def _extract_revenue(row: dict) -> float:
-    """Safely extract revenue from a row using synonymous keys."""
+    """Safely extract revenue from a row using V2 standard keys."""
+    # V2 Standard Keys (High Priority)
+    for key in ["Revenue (INR)", "Total Revenue (INR)", "Verified Revenue", "Gross Margin (Valid)", "Gross Margin (All)"]:
+        if key in row and row[key] is not None:
+            try:
+                return float(row[key])
+            except (ValueError, TypeError):
+                continue
+                
+    # V1/Legacy Keys (Fallback)
     for key in ["total_net_revenue", "total_revenue", "revenue_30d", "total_net_sales"]:
         if key in row and row[key] is not None:
             try:
@@ -131,16 +140,14 @@ def narrate(plan: dict, data: dict) -> str:
     else:
         sys_prompt = (
             "You are an elite Business Analyst for NK Proteins. Summarize the provided data. "
-            "CRITICAL RULE 1: If you see the same region multiple times with different units (KG, EA, CS), you MUST sum their revenues "
-            "to report the true 'Total Regional Revenue'. Do not ignore small entries."
+            "CRITICAL RULE 1: DO NOT CALCULATE SUMS. I have provided the 'Calculated Ground Truth' below. USE IT EXACTLY. "
+            "If your mental math disagrees with my Ground Truth, MY GROUND TRUTH IS ALWAYS RIGHT. "
             "CRITICAL RULE 2: Every currency value MUST be prefixed with ₹ (INR). The dollar ($) is strictly forbidden. "
             "CRITICAL RULE 3 (CONTEXT ISOLATION): Do NOT reuse product names, customers, or SKUs from earlier in the conversation. "
             "ONLY report names that are explicitly present in the 'Raw Data' JSON below. "
             "CRITICAL RULE 4 (SKU FORMATTING): When listing products, ALWAYS include the Product ID if available. "
             "Format as: 'PID [ProductName]'. For example: '20101 [TIRUPATI COTTON OIL]'. "
-            "CRITICAL RULE 5 (BOM LOGIC): If multiple rows exist for the same Product ID in a Bill of Material (BOM) result, "
-            "it represents the individual components required for that specific finished good. List them clearly as components. "
-            "Write 2-3 concise sentences. Start with the Grand Total across all regions."
+            "CRITICAL RULE 5: Keep your answer to 2-3 concise sentences. Start with the 'Calculated Ground Truth' provided in the user prompt."
         )
     
     # Pre-calculate totals for the 'Accuracy Auditor' (Internal validation)
@@ -156,12 +163,12 @@ def narrate(plan: dict, data: dict) -> str:
         
         user_prompt = (
             f"Context: {intent} comparison.\n"
-            f"Reference Totals (Verify your math against these sums):\n"
+            f"CALCULATED GROUND TRUTH (DO NOT RE-CALCULATE):\n"
             f"- Grand Total: ₹{total_for_audit:,.2f}\n"
             + "\n".join([f"- {k} Total: ₹{v:,.2f}" for k, v in regional_totals.items()]) + "\n"
             f"\nRaw Data (rows: {row_count}):\n"
             f"```json\n{json.dumps(rows[:15], indent=2)}\n```\n"
-            "Executive Summary:"
+            "Executive Summary (USE GROUND TRUTH FIGURES):"
         )
     elif intent == "bom_lookup":
         user_prompt = (
