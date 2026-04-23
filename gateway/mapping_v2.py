@@ -4,17 +4,18 @@
 # Priority 2: Detail / Breakdown Intents
 # Priority 1: High-level / Summary Intents
 INTENT_PRIORITY = {
+    "revenue_by_region": 15,
+    "profitability_all": 9,
+    "profitability_valid": 8,
     "revenue_by_region_product": 10,
     "sales_office_customer_revenue": 6,
     "top_products_overall": 5,
     "top_products_revenue_unit_safe": 5,
-    "revenue_by_region": 15,
     "revenue_by_plant": 4,
     "monthly_revenue_trend": 2,
     "daily_revenue_trend": 2,
     "list_sales_offices": 2,
     "total_revenue": 1,
-    "profitability_valid": 1,
 }
 
 # Recognized Sales Offices for parameter extraction
@@ -66,11 +67,12 @@ INTENT_MAP = {
     ],
     "profitability_all": [
         "profitability margin", "profitability", "margin", 
-        "overall margin", "estimated profit", "theoretical margin"
+        "overall margin", "estimated profit", "theoretical margin",
+        "how much profit", "profit summary", "company margin"
     ],
     "profitability_valid": [
         "total profit", "real profit", "profit where cost exists", 
-        "actual margin", "gross margin valid"
+        "actual margin", "gross margin valid", "verified margin", "audited profit"
     ],
     "monthly_revenue_trend": [
         "monthly revenue trend", "monthly sales revenue", "monthly trend",
