@@ -8,7 +8,7 @@ INTENT_PRIORITY = {
     "sales_office_customer_revenue": 6,
     "top_products_overall": 5,
     "top_products_revenue_unit_safe": 5,
-    "revenue_by_region": 4,
+    "revenue_by_region": 15,
     "revenue_by_plant": 4,
     "monthly_revenue_trend": 2,
     "daily_revenue_trend": 2,
@@ -37,7 +37,10 @@ INTENT_MAP = {
     ],
     "revenue_by_region": [
         "revenue by region", "sales by region", "regional sales", "region wise",
-        "which region has most revenue", "demand by region", "customer region"
+        "which region has most revenue", "demand by region", "customer region",
+        "nk proteins regional revenue", "sap region sales", "ground truth region sales",
+        "actual region revenue", "real sales by region", "only region revenue",
+        "strictly regional sales"
     ],
     "revenue_by_plant": [
         "total revenue broken down by plant", "revenue broken down by plant",
