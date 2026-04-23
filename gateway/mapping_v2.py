@@ -68,7 +68,8 @@ INTENT_MAP = {
     "profitability_all": [
         "profitability margin", "profitability", "margin", 
         "overall margin", "estimated profit", "theoretical margin",
-        "how much profit", "profit summary", "company margin"
+        "how much profit", "profit summary", "company margin",
+        "gross profit", "net profit", "profit amount", "profit"
     ],
     "profitability_valid": [
         "total profit", "real profit", "profit where cost exists", 
