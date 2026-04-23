@@ -57,7 +57,7 @@ INTENT_MAP = {
         "top 10 products", "top 10 products by revenue", "highest revenue items"
     ],
     "revenue_by_region_product": [
-        "top products by region", "best products in each region", 
+        "top products by region", "best products in each region",
         "region wise top products"
     ],
     "product_performance_detailed": [
@@ -65,6 +65,7 @@ INTENT_MAP = {
         "sales by material", "product analysis"
     ],
     "profitability_all": [
+        "profitability margin", "profitability", "margin", 
         "overall margin", "estimated profit", "theoretical margin"
     ],
     "profitability_valid": [
