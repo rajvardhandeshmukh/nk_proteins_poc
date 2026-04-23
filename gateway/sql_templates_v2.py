@@ -40,7 +40,8 @@ SQL_TEMPLATES = {
         SELECT TOP 10 Material, 
                ProductName, 
                BillingQuantityUnit AS [Unit],
-               SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)]
+               SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)],
+               SUM(CAST(BillingQuantity AS DECIMAL(20,2))) AS [Total Quantity]
         FROM fact_sales
         GROUP BY Material, ProductName, BillingQuantityUnit
         ORDER BY [Revenue (INR)] DESC;

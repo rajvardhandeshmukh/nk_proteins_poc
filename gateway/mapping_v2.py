@@ -62,7 +62,7 @@ INTENT_MAP = {
     ],
     "product_performance_detailed": [
         "product performance", "detailed product sales", "product quantity",
-        "sales by material", "product analysis"
+        "sales by material", "product analysis", "quantity", "qty"
     ],
     "profitability_all": [
         "profitability margin", "profitability", "margin", 
