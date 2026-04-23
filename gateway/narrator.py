@@ -1,6 +1,6 @@
 import logging
 import json
-from .llm_client import call_granite
+from .llm_client import call_llm
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +202,7 @@ def narrate(plan: dict, data: dict) -> str:
     
     logger.info("Triggering Intelligent Narration (Phase 2C) for intent: %s", intent)
     try:
-        response = call_granite(
+        response = call_llm(
             user_prompt=user_prompt,
             system_prompt=sys_prompt,
             max_tokens=400,
@@ -234,8 +234,8 @@ def _fallback_hardcoded(intent: str, params: dict, data: dict, correction_note: 
     rows = data.get("data", [])
     row_count = data.get("row_count", 0)
 
-    if intent == "region_comparison":
-        top_region = rows[0].get("region", "N/A")
+    if intent == "region_comparison" or intent == "revenue_by_region":
+        top_region = rows[0].get("Region", "N/A")
         total_rev = sum(_extract_revenue(r) for r in rows)
         return (
             f"Regional Performance Summary (INR):\n"
@@ -244,12 +244,11 @@ def _fallback_hardcoded(intent: str, params: dict, data: dict, correction_note: 
             f"• All figures accurately reported in Indian Rupees (₹)."
         )
 
-    if intent == "revenue_trend":
-        months = params.get("months_back", 12)
-        total = sum(r.get("total_revenue", 0) for r in rows)
+    if intent == "revenue_trend" or intent == "monthly_revenue_trend":
+        total = sum(_extract_revenue(r) for r in rows)
         return (
             f"Business Performance Summary:\n"
-            f"• {months}-month revenue total: ₹{total:,.2f}\n"
+            f"• Total revenue for the period: ₹{total:,.2f}\n"
             f"• All monetary data processed and reported in INR (₹)."
         )
 

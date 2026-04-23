@@ -25,8 +25,9 @@ from .planner import plan_query
 from .llm_planner import plan_query_llm
 from .llm_sql import generate_sql_dynamic
 from .narrator import narrate
-from .sql_templates import SQL_TEMPLATES, VALID_INTENTS
-from .mapping_v2 import get_intent as get_v2_intent
+from .sql_templates_v2 import SQL_TEMPLATES
+VALID_INTENTS = list(SQL_TEMPLATES.keys())
+from .mapping_v2 import get_intent
 from .validators import load_entity_cache
 from .telemetry import log_error, log_plan, log_narration
 from .governance import get_reliability, get_governance_notes, detect_conflicts, ReliabilityLevel
@@ -145,7 +146,7 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
 
     try:
         # [POC V2 BYPASS] Pure Sales Math Fast Path
-        v2_match = get_v2_intent(request.query)
+        v2_match = get_intent(request.query)
         if v2_match and v2_match.get("intent") != "unknown":
             print(f"!!! [POC V2 BYPASS] Matched to V2 Intent: {v2_match['intent']}")
             v2_intent = v2_match["intent"]

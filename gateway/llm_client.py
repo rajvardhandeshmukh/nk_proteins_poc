@@ -58,7 +58,7 @@ def _get_watsonx_config():
         )
 
 
-def call_granite(
+def call_llm(
     user_prompt: str,
     system_prompt: str,
     model_id: str = None,
@@ -67,7 +67,7 @@ def call_granite(
     is_json: bool = True,
 ) -> dict:
     """
-    Call IBM Granite via Watsonx.
+    Call the primary LLM (currently Llama 3.1 70B) via Watsonx.
 
     Returns:
         {
@@ -122,7 +122,7 @@ def call_granite(
         response_text = result.get("generated_text", "").strip()
         token_count = result.get("generated_token_count", 0)
 
-        logger.info("Granite call: model=%s, tokens=%d, latency=%dms", model_id, token_count, duration_ms)
+        logger.info("LLM call: model=%s, tokens=%d, latency=%dms", model_id, token_count, duration_ms)
 
         return {
             "text": response_text,
@@ -134,16 +134,16 @@ def call_granite(
 
     except Exception as e:
         duration_ms = round((time.time() - start) * 1000)
-        error_msg = f"Granite LLM error: {str(e)}"
+        error_msg = f"LLM error: {str(e)}"
         
         if "timeout" in str(e).lower() or isinstance(e, TimeoutError):
-            error_type = "granite_timeout"
-            error_msg = f"Granite API Timeout: {str(e)}"
+            error_type = "llm_timeout"
+            error_msg = f"LLM API Timeout: {str(e)}"
         elif "failed to resolve" in str(e).lower() or "connection" in str(e).lower():
-            error_type = "granite_network_error"
-            error_msg = f"Granite Network Failure (Check Internet/DNS): {str(e)}"
+            error_type = "llm_network_error"
+            error_msg = f"LLM Network Failure (Check Internet/DNS): {str(e)}"
         else:
-            error_type = "granite_call_failed"
+            error_type = "llm_call_failed"
             
         logger.error(error_msg)
         log_error(
