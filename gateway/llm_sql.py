@@ -9,7 +9,7 @@ MUST pass through validation before execution.
 import sys
 import os
 import logging
-from .llm_client import call_granite
+from .llm_client import call_llm
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from hub.config import SQL_SCHEMA
@@ -39,7 +39,7 @@ def generate_sql_dynamic(user_input: str) -> dict:
     """Generate ad-hoc MS SQL query from LLM and validate it."""
     logger.warning("Falling back to DYNAMIC SQL GENERATION for query: %s", user_input)
     
-    response = call_granite(
+    response = call_llm(
         user_prompt=user_input,
         system_prompt=SQL_GEN_SYSTEM_PROMPT,
         temperature=0.0,

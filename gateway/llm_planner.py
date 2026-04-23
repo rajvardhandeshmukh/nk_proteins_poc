@@ -8,7 +8,7 @@ extract parameters, and return JSON.
 
 import json
 import logging
-from .llm_client import call_granite
+from .llm_client import call_llm
 from .sql_templates import VALID_INTENTS
 from .telemetry import log_plan
 
@@ -82,10 +82,10 @@ Format your output ONLY as RAW JSON:
 """
 
 def plan_query_llm(user_input: str) -> dict:
-    """Fallback planner using Granite."""
-    logger.info("Using Granite LLM for planning fallback...")
+    """Fallback planner using the primary LLM."""
+    logger.info("Using LLM for planning fallback...")
     
-    response = call_granite(
+    response = call_llm(
         user_prompt=user_input,
         system_prompt=PLANNER_SYSTEM_PROMPT,
         temperature=0.0,
