@@ -2,7 +2,7 @@
 import logging
 logger = logging.getLogger(__name__)
 
-# Priority: Higher number = Checked first
+# Priority: Drilldowns and Analysis first
 INTENT_PRIORITY = {
     "customer_product_revenue": 10,
     "product_price_analysis": 8,
@@ -16,39 +16,37 @@ INTENT_PRIORITY = {
     "total_revenue": 1,
 }
 
+# EXACT USER MAPPING V3
 INTENT_MAP = {
     "total_revenue": [
-        "total revenue", "overall sales", "how much did we sell", "total sales",
-        "company revenue", "grand total revenue", "revenue", "sales", "show revenue", "total"
+        "total revenue", "total sales", "overall revenue"
     ],
     "total_quantity": [
-        "total quantity", "how many units", "total volume", "bill qty total", "quantity total"
+        "total quantity", "total qty"
     ],
     "revenue_by_customer": [
-        "revenue by customer", "customer wise sales", "customer sales", "which customer spent most"
+        "sales by customer", "revenue by customer"
     ],
     "revenue_by_product": [
-        "revenue by product", "product wise sales", "product sales", "sales by material"
+        "sales by product", "revenue by product"
     ],
     "customer_product_revenue": [
-        "what did customer buy", "customer product breakdown", "drilldown", 
-        "product breakdown for", "sales for customer"
+        "customer product sales", "product by customer"
     ],
     "product_price_analysis": [
-        "product price analysis", "price per unit", "average price", "derived price", 
-        "price behavior of product", "product value"
+        "product price", "price of product", "product pricing"
     ],
     "customer_price_analysis": [
-        "customer price analysis", "how much customer pays", "customer price behavior"
+        "customer price", "price per customer"
     ],
     "top_products": [
-        "top products", "top selling products", "best sellers", "product ranking", "top 10 products"
+        "top products", "best products"
     ],
     "top_customers": [
-        "top customers", "best customers", "customer ranking", "top 10 customers"
+        "top customers", "best customers"
     ],
     "transaction_view": [
-        "transaction view", "raw sales", "audit view", "show me data", "list transactions", "show transactions"
+        "show transactions", "raw data"
     ]
 }
 
@@ -65,6 +63,7 @@ def map_intent(query):
     if not matches:
         return "unknown"
         
+    # Sort by priority, then by keyword length to get most specific match
     matches.sort(key=lambda x: (x[0], x[1]), reverse=True)
     return matches[0][2]
 
@@ -78,7 +77,7 @@ def get_intent(query):
         return {
             "intent": "unknown",
             "params": {},
-            "message": "Query not supported. Ask for 'total revenue', 'top products', 'price analysis', or 'transaction view'."
+            "message": "Query not supported. Try 'total sales', 'product price', or 'raw data'."
         }
         
     return {
