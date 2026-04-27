@@ -80,11 +80,16 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
     Returns (filled_sql_string, safe_params_dict).
     """
     # [POC V2 BYPASS] Check V2 Templates FIRST
-    if hasattr(sql_templates_v2, 'SQL_TEMPLATES') and intent in sql_templates_v2.SQL_TEMPLATES:
-        query = sql_templates_v2.SQL_TEMPLATES[intent]
-        # Direct Ground-Truth Reference
-        query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
-        return query.strip(), params
+    print(f"!!! [DEBUG] _build_query called with intent: '{intent}'")
+    if hasattr(sql_templates_v2, 'SQL_TEMPLATES'):
+        print(f"!!! [DEBUG] V2 Templates Available: {list(sql_templates_v2.SQL_TEMPLATES.keys())}")
+        if intent in sql_templates_v2.SQL_TEMPLATES:
+            query = sql_templates_v2.SQL_TEMPLATES[intent]
+            # Direct Ground-Truth Reference
+            query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
+            return query.strip(), params
+    else:
+        print("!!! [DEBUG] sql_templates_v2 has NO SQL_TEMPLATES attribute!")
 
     if intent not in sql_templates.SQL_TEMPLATES:
         # If it's the specific V2 'unknown' intent, provide a clean message
@@ -137,24 +142,58 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
 MAX_RETRIES = 2
 QUERY_TIMEOUT_SEC = 15
 
+_SCHEMA_VALIDATED = False
+
+def validate_schema():
+    """
+    Startup Pulse Check: Verifies all .env column mappings exist in the DB.
+    Prevents 'Silent Column Mismatch' issues.
+    """
+    global _SCHEMA_VALIDATED
+    if _SCHEMA_VALIDATED:
+        return
+    
+    from .config import config
+    logger.info("!!! [SCHEMA VALIDATION] Starting startup pulse check...")
+    
+    engine = get_engine()
+    column_map = config.get_column_map()
+    table = config.TABLE_SALES
+    
+    failed_cols = []
+    with engine.connect() as conn:
+        for key, col in column_map.items():
+            try:
+                # Optimized check: SELECT TOP 1 is fast and safe for existence check
+                conn.execute(text(f"SELECT TOP 1 {col} FROM {table}"))
+                logger.info(f"  [PASS] Column '{key}' -> '{col}' verified.")
+            except Exception as e:
+                logger.error(f"  [FAIL] Column '{key}' -> '{col}' NOT FOUND in table '{table}'.")
+                failed_cols.append(f"{key}:{col}")
+    
+    if failed_cols:
+        error_msg = f"CRITICAL SCHEMA MISMATCH: The following columns in your .env do not exist in the database: {failed_cols}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+    
+    _SCHEMA_VALIDATED = True
+    logger.info("!!! [SCHEMA VALIDATION] All columns verified successfully.")
+
 def execute_query(intent: str, params: dict) -> dict:
     """
     The main entry point for Floor 2.
-
-    Input:  {"intent": "revenue_trend", "params": {"months_back": 6, "region": "Gujarat"}}
-    Output: {"status": "success", "data": [...], "row_count": N, "query_ms": M}
     """
     start = time.time()
-    # FORCE RELOAD BOTH TEMplate LIBRARIES
-    import importlib
-    from . import sql_templates, sql_templates_v2
-    importlib.reload(sql_templates)
-    importlib.reload(sql_templates_v2)
+    
+    # 0. Startup Pulse Check (Run once)
+    try:
+        validate_schema()
+    except Exception as e:
+        return {"status": "error", "intent": intent, "message": str(e), "data": [], "row_count": 0, "query_ms": 0}
 
-    # 1. Build the safe query (validates types + fuzzy corrections)
+    # 1. Build the safe query
     try:
         sql, safe_params = _build_query(intent, params)
-        print(f"!!! [GROUND TRUTH AUDIT] Intent: {intent} | Month: {safe_params.get('month')} | DB: {os.getenv('MSSQL_DATABASE')}")
     except ValueError as e:
         elapsed_ms = round((time.time() - start) * 1000)
         log_query(intent=intent, query="", params=params, row_count=0, latency_ms=elapsed_ms, status=f"validation_error: {e}")
@@ -166,14 +205,16 @@ def execute_query(intent: str, params: dict) -> dict:
         try:
             engine = get_engine(force_new=(attempt > 1))
             with engine.connect() as conn:
-                # ABSOLUTE DIAGNOSTIC: Log the raw SQL and params
-                print(f"!!! [SQL EXECUTION DEBUG] SQL: {sql}")
-                print(f"!!! [SQL EXECUTION DEBUG] Params: {safe_params}")
+                # --- IMPROVED QUERY READABILITY (LOGGING) ---
+                print("\n" + "="*80)
+                print(f"SQL EXECUTION TRACE | Intent: {intent} | Attempt: {attempt}")
+                print("-"*80)
+                print(f"QUERY:\n{sql}")
+                print(f"PARAMS: {safe_params}")
+                print("="*80 + "\n")
                 
                 df = pd.read_sql(text(sql), conn, params=safe_params)
                 
-                print(f"!!! [SQL EXECUTION DEBUG] Result Row Count: {len(df)}")
-
             elapsed_ms = round((time.time() - start) * 1000)
 
             # Timeout check
@@ -248,8 +289,13 @@ def execute_raw_sql(sql_query: str) -> dict:
         try:
             engine = get_engine(force_new=(attempt > 1))
             with engine.connect() as conn:
-                # ABSOLUTE DIAGNOSTIC: Log the raw dynamic SQL
-                print(f"!!! [SQL DYNAMIC EXECUTION] SQL: {sql_query}")
+                # --- IMPROVED QUERY READABILITY (LOGGING) ---
+                print("\n" + "="*80)
+                print(f"SQL DYNAMIC EXECUTION | Attempt: {attempt}")
+                print("-"*80)
+                print(f"QUERY:\n{sql_query}")
+                print("="*80 + "\n")
+                
                 df = pd.read_sql(text(sql_query), conn)
 
             elapsed_ms = round((time.time() - start) * 1000)

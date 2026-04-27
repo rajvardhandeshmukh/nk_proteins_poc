@@ -42,11 +42,11 @@ def load_entity_cache():
         with engine.connect() as conn:
             ENTITY_CACHE = {
                 "region": set(
-                    pd.read_sql("SELECT DISTINCT region FROM fact_sales", conn)["region"].dropna()
+                    pd.read_sql("SELECT DISTINCT CustomerRegionName FROM fact_sales", conn)["CustomerRegionName"].dropna()
                 ),
                 "customer": set([]), # Customer names not available in core fact tables yet
                 "product": set(
-                    pd.read_sql("SELECT DISTINCT product_name FROM fact_sales", conn)["product_name"].dropna()
+                    pd.read_sql("SELECT DISTINCT ProductName FROM fact_sales", conn)["ProductName"].dropna()
                 ),
                 "warehouse": set(
                     pd.read_sql("SELECT DISTINCT location_name FROM fact_inventory", conn)["location_name"].dropna()

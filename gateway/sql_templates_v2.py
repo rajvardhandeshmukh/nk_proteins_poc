@@ -1,123 +1,123 @@
-# SQL Templates for Pure Sales Mode (V2 - Strict Logic)
+# SQL Templates for Pure Sales Mode (V2 - Ground Truth Protocol V3)
+from .config import config
+
+# Rules implemented:
+# 1. Revenue = SUM(Gross Value)
+# 2. Quantity = SUM(Bill Qty) 
+# 3. Derived Price = Revenue / Row Count
+# 4. Transaction Price = Price Per Unit (Direct from row)
+# 5. Product Grouping = Material Code + Material Desc
 
 SQL_TEMPLATES = {
-    "total_revenue": """
-        SELECT SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Total Revenue (INR)]
-        FROM fact_sales;
+    # 1. Total Revenue
+    "total_revenue": f"""
+        SELECT SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) AS [Total Revenue]
+        FROM {config.TABLE_SALES};
     """,
-    
-    "revenue_by_region": """
-        -- Demand View
-        SELECT CustomerRegionName AS [Region], 
-               SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)]
-        FROM fact_sales
-        GROUP BY CustomerRegionName
-        ORDER BY [Revenue (INR)] DESC;
-    """,
-    
-    "revenue_by_plant": """
-        -- Supply View
-        SELECT PlantCityName AS [Supply Point], 
-               SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)]
-        FROM fact_sales
-        GROUP BY PlantCityName
-        ORDER BY [Revenue (INR)] DESC;
-    """,
-    
-    "top_products_overall": """
-        -- Global Revenue Ranking (Ignores units as revenue is additive)
-        SELECT TOP 10 
-               Material,
-               ProductName,
-               SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)]
-        FROM fact_sales
-        GROUP BY Material, ProductName
-        ORDER BY [Revenue (INR)] DESC;
-    """,
-    
-    "top_products_revenue_unit_safe": """
-        -- Demand View (Strictly separated by unit)
-        SELECT TOP 10 Material, 
-               ProductName, 
-               BillingQuantityUnit AS [Unit],
-               SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)],
-               SUM(CAST(BillingQuantity AS DECIMAL(20,2))) AS [Total Quantity]
-        FROM fact_sales
-        GROUP BY Material, ProductName, BillingQuantityUnit
-        ORDER BY [Revenue (INR)] DESC;
-    """,
-    
-    "product_performance_detailed": """
-        -- Strict Unit Isolation Rule
-        SELECT Material, 
-               ProductName, 
-               BillingQuantityUnit AS [Unit],
-               SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)],
-               SUM(CAST(BillingQuantity AS DECIMAL(20,2))) AS [Total Quantity]
-        FROM fact_sales
-        GROUP BY Material, ProductName, BillingQuantityUnit
-        ORDER BY [Revenue (INR)] DESC, [Total Quantity] DESC;
-    """,
-    
-    "profitability_all": """
-        -- GrossMargin_All (Includes zero-cost rows)
-        SELECT SUM(CAST(NetAmount - CostAmount AS DECIMAL(20,2))) AS [Gross Margin (All)]
-        FROM fact_sales;
-    """,
-    
-    "profitability_valid": """
-        -- Analyzes only rows where CostAmount is available
-        SELECT 
-            SUM(CAST(NetAmount - CostAmount AS DECIMAL(20,2))) AS [Gross Margin (Valid)],
-            COUNT(*) AS [Rows Used],
-            SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue Covered]
-        FROM fact_sales
-        WHERE CostAmount > 0;
-    """,
-    
-    "monthly_revenue_trend": """
-        SELECT 
-            CONCAT(YEAR(BillingDocumentDate), '-', RIGHT('0' + CAST(MONTH(BillingDocumentDate) AS VARCHAR), 2)) AS [Year-Month],
-            SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)]
-        FROM fact_sales
-        GROUP BY YEAR(BillingDocumentDate), MONTH(BillingDocumentDate)
-        ORDER BY [Year-Month];
-    """,
-    
-    "daily_revenue_trend": """
-        SELECT CAST(BillingDocumentDate AS DATE) AS [Date],
-               SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)]
-        FROM fact_sales
-        GROUP BY CAST(BillingDocumentDate AS DATE)
-        ORDER BY [Date] ASC;
 
+    # 2. Total Quantity
+    "total_quantity": f"""
+        SELECT SUM(CAST({config.COL_QUANTITY} AS DECIMAL(20,2))) AS [Total Quantity]
+        FROM {config.TABLE_SALES};
     """,
-    "revenue_by_region_product": """
-    -- Demand View (Unit-safe)
-    SELECT CustomerRegionName AS [Region],
-           Material,
-           ProductName,
-           BillingQuantityUnit AS [Unit],
-           SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)]
-    FROM fact_sales
-    GROUP BY CustomerRegionName, Material, ProductName, BillingQuantityUnit
-    ORDER BY [Revenue (INR)] DESC;
-""",
-"list_sales_offices": """
-    SELECT DISTINCT SalesOfficeName AS [Sales Office]
-    FROM fact_sales
-    ORDER BY SalesOfficeName;
-""",
 
-"sales_office_customer_revenue": """
-    SELECT 
-        SalesOfficeName AS [Sales Office],
-        CustomerName AS [Customer],
-        SUM(CAST(NetAmount AS DECIMAL(20,2))) AS [Revenue (INR)]
-    FROM fact_sales
-    WHERE SalesOfficeName = '{sales_office}'
-    GROUP BY SalesOfficeName, CustomerName
-    ORDER BY [Revenue (INR)] DESC;
-""",
+    # 3. Revenue by Customer
+    "revenue_by_customer": f"""
+        SELECT 
+            {config.COL_CUSTOMER} AS [Customer],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) AS [Revenue],
+            SUM(CAST({config.COL_QUANTITY} AS DECIMAL(20,2))) AS [Total Quantity]
+        FROM {config.TABLE_SALES}
+        GROUP BY {config.COL_CUSTOMER}
+        ORDER BY [Revenue] DESC;
+    """,
+
+    # 4. Revenue by Product
+    "revenue_by_product": f"""
+        SELECT 
+            {config.COL_MATERIAL} AS [Product ID],
+            {config.COL_PRODUCT_NAME} AS [Product Name],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) AS [Revenue],
+            SUM(CAST({config.COL_QUANTITY} AS DECIMAL(20,2))) AS [Total Quantity]
+        FROM {config.TABLE_SALES}
+        GROUP BY {config.COL_MATERIAL}, {config.COL_PRODUCT_NAME}
+        ORDER BY [Revenue] DESC;
+    """,
+
+    # 5. Customer -> Product Drilldown
+    "customer_product_revenue": f"""
+        SELECT 
+            {config.COL_CUSTOMER} AS [Customer],
+            {config.COL_MATERIAL} AS [Product ID],
+            {config.COL_PRODUCT_NAME} AS [Product Name],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) AS [Revenue],
+            SUM(CAST({config.COL_QUANTITY} AS DECIMAL(20,2))) AS [Total Quantity]
+        FROM {config.TABLE_SALES}
+        GROUP BY {config.COL_CUSTOMER}, {config.COL_MATERIAL}, {config.COL_PRODUCT_NAME}
+        ORDER BY [Customer], [Revenue] DESC;
+    """,
+
+    # 6. Product Price Analysis (Dual Price Logic)
+    "product_price_analysis": f"""
+        SELECT 
+            {config.COL_MATERIAL} AS [Product ID],
+            {config.COL_PRODUCT_NAME} AS [Product Name],
+            AVG(CAST({config.COL_PRICE_UNIT} AS DECIMAL(20,2))) AS [Avg Price Per Unit],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) * 1.0 / NULLIF(COUNT(*), 0) AS [Derived Price],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) AS [Revenue],
+            SUM(CAST({config.COL_QUANTITY} AS DECIMAL(20,2))) AS [Total Quantity]
+        FROM {config.TABLE_SALES}
+        GROUP BY {config.COL_MATERIAL}, {config.COL_PRODUCT_NAME}
+        ORDER BY [Revenue] DESC;
+    """,
+
+    # 7. Customer Price Behavior
+    "customer_price_analysis": f"""
+        SELECT 
+            {config.COL_CUSTOMER} AS [Customer],
+            AVG(CAST({config.COL_PRICE_UNIT} AS DECIMAL(20,2))) AS [Avg Price Per Unit],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) * 1.0 / NULLIF(COUNT(*), 0) AS [Derived Price],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) AS [Revenue],
+            SUM(CAST({config.COL_QUANTITY} AS DECIMAL(20,2))) AS [Total Quantity]
+        FROM {config.TABLE_SALES}
+        GROUP BY {config.COL_CUSTOMER}
+        ORDER BY [Revenue] DESC;
+    """,
+
+    # 8. Top Products
+    "top_products": f"""
+        SELECT TOP 10
+            {config.COL_MATERIAL} AS [Product ID],
+            {config.COL_PRODUCT_NAME} AS [Product Name],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) AS [Revenue],
+            SUM(CAST({config.COL_QUANTITY} AS DECIMAL(20,2))) AS [Total Quantity]
+        FROM {config.TABLE_SALES}
+        GROUP BY {config.COL_MATERIAL}, {config.COL_PRODUCT_NAME}
+        ORDER BY [Revenue] DESC;
+    """,
+
+    # 9. Top Customers
+    "top_customers": f"""
+        SELECT TOP 10
+            {config.COL_CUSTOMER} AS [Customer],
+            SUM(CAST({config.COL_NET_AMOUNT} AS DECIMAL(20,2))) AS [Revenue],
+            SUM(CAST({config.COL_QUANTITY} AS DECIMAL(20,2))) AS [Total Quantity]
+        FROM {config.TABLE_SALES}
+        GROUP BY {config.COL_CUSTOMER}
+        ORDER BY [Revenue] DESC;
+    """,
+
+    # 10. Raw Transaction View (Audit)
+    "transaction_view": f"""
+        SELECT TOP 50
+            {config.COL_DATE} AS [Billing Date],
+            {config.COL_CUSTOMER} AS [Customer Name],
+            {config.COL_MATERIAL} AS [Material Code],
+            {config.COL_PRODUCT_NAME} AS [Material Desc],
+            {config.COL_QUANTITY} AS [Bill Qty],
+            {config.COL_PRICE_UNIT} AS [Price Per Unit],
+            {config.COL_NET_AMOUNT} AS [Gross Value]
+        FROM {config.TABLE_SALES}
+        ORDER BY {config.COL_DATE};
+    """
 }
-

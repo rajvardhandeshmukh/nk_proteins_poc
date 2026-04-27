@@ -1,104 +1,55 @@
-# Intent Mapping for Pure Sales Mode (V2)
+# Intent Mapping for Pure Sales Mode (V2 - Ground Truth Protocol V3)
+import logging
+logger = logging.getLogger(__name__)
 
-# Priority 3: Combined / Complex Intents
-# Priority 2: Detail / Breakdown Intents
-# Priority 1: High-level / Summary Intents
+# Priority: Higher number = Checked first
 INTENT_PRIORITY = {
-    "revenue_by_region": 15,
-    "profitability_all": 9,
-    "profitability_valid": 8,
-    "revenue_by_region_product": 10,
-    "sales_office_customer_revenue": 6,
-    "top_products_overall": 5,
-    "top_products_revenue_unit_safe": 5,
-    "revenue_by_plant": 4,
-    "monthly_revenue_trend": 2,
-    "daily_revenue_trend": 2,
-    "list_sales_offices": 2,
+    "customer_product_revenue": 10,
+    "product_price_analysis": 8,
+    "customer_price_analysis": 8,
+    "transaction_view": 7,
+    "top_products": 5,
+    "top_customers": 5,
+    "revenue_by_customer": 4,
+    "revenue_by_product": 4,
+    "total_quantity": 2,
     "total_revenue": 1,
 }
-
-# Recognized Sales Offices for parameter extraction
-SALES_OFFICES = [
-    "Ahmedabad", "Ahmedabad City", "Akola", "Amreli", "Amritsar", "Anand", "Bananskantha", 
-    "Bareilly", "Baroda", "Baroda City", "Bharuch", "Bharuch City", "Bhavnagar", "Centre - 5", 
-    "Chittorgarh", "Dahod", "Delhi", "FMCG Sales office", "Gandhinagar", "Haryana", 
-    "Himachal Pradesh", "Indore", "Jaipur", "Jamnagar", "Jamnagar City", "Junagadh", 
-    "Junagadh City", "Kheda", "Kota", "Kutch-Bhuj", "Madhya Pradesh", "Maharastra", 
-    "Mehsana", "Modern Trade", "Mumbai", "Narmada", "Navsari", "NKPL Head Office", 
-    "NKRL Head Office", "Out-State", "Pnachmahal", "Patan", "Porbandar", "Rajasthan", 
-    "Rajkot", "Rajkot City", "Rajsamand", "Retail", "Sabarkantha", "Surat", "Surat City", 
-    "Surendra Nagar", "Udaipur", "Valsad"
-]
 
 INTENT_MAP = {
     "total_revenue": [
         "total revenue", "overall sales", "how much did we sell", "total sales",
-        "company revenue", "net amount total", "grand total revenue"
+        "company revenue", "grand total revenue", "revenue", "sales", "show revenue", "total"
     ],
-    "revenue_by_region": [
-        "revenue by region", "sales by region", "regional sales", "region wise",
-        "which region has most revenue", "demand by region", "customer region",
-        "nk proteins regional revenue", "sap region sales", "ground truth region sales",
-        "actual region revenue", "real sales by region", "only region revenue",
-        "strictly regional sales"
+    "total_quantity": [
+        "total quantity", "how many units", "total volume", "bill qty total", "quantity total"
     ],
-    "revenue_by_plant": [
-        "total revenue broken down by plant", "revenue broken down by plant",
-        "revenue by plant", "sales by plant", "supply point sales",
-        "plant city revenue", "fulfillment revenue"
+    "revenue_by_customer": [
+        "revenue by customer", "customer wise sales", "customer sales", "which customer spent most"
     ],
-    "top_products_overall": [
-        "top products overall", "global top products", "best sellers overall",
-        "most revenue products global"
+    "revenue_by_product": [
+        "revenue by product", "product wise sales", "product sales", "sales by material"
     ],
-    "top_products_revenue_unit_safe": [
-        "top products", "best selling products", "most revenue product",
-        "product ranking", "top selling materials", "top sellers", "top materials",
-        "top 10 products", "top 10 products by revenue", "highest revenue items"
+    "customer_product_revenue": [
+        "what did customer buy", "customer product breakdown", "drilldown", 
+        "product breakdown for", "sales for customer"
     ],
-    "revenue_by_region_product": [
-        "top products by region", "best products in each region",
-        "region wise top products"
+    "product_price_analysis": [
+        "product price analysis", "price per unit", "average price", "derived price", 
+        "price behavior of product", "product value"
     ],
-    "product_performance_detailed": [
-        "product performance", "detailed product sales", "product quantity",
-        "sales by material", "product analysis", "quantity", "qty"
+    "customer_price_analysis": [
+        "customer price analysis", "how much customer pays", "customer price behavior"
     ],
-    "profitability_all": [
-        "profitability margin", "profitability", "margin", 
-        "overall margin", "estimated profit", "theoretical margin",
-        "how much profit", "profit summary", "company margin",
-        "gross profit", "net profit", "profit amount", "profit"
+    "top_products": [
+        "top products", "top selling products", "best sellers", "product ranking", "top 10 products"
     ],
-    "profitability_valid": [
-        "total profit", "real profit", "profit where cost exists", 
-        "actual margin", "gross margin valid", "verified margin", "audited profit"
+    "top_customers": [
+        "top customers", "best customers", "customer ranking", "top 10 customers"
     ],
-    "monthly_revenue_trend": [
-        "monthly revenue trend", "monthly sales revenue", "monthly trend",
-        "revenue over time", "sales by month", "monthly growth"
-    ],
-    "daily_revenue_trend": [
-        "daily trend", "day wise sales", "daily revenue", "revenue per day"
-    ],
-    
-    "sales_office_customer_revenue": [
-        "sales office sold to which customers",
-        "customers for sales office",
-        "who did sales office sell to",
-        "sales office customer revenue",
-        "customers and revenue for sales office",
-        "sales office", "office revenue"
-    ],
-
-    "list_sales_offices": [
-        "list sales offices",
-        "all sales offices",
-        "show sales office names",
-        "available sales offices",
-        "which offices", "list offices"
-    ],
+    "transaction_view": [
+        "transaction view", "raw sales", "audit view", "show me data", "list transactions", "show transactions"
+    ]
 }
 
 def map_intent(query):
@@ -109,19 +60,17 @@ def map_intent(query):
         priority = INTENT_PRIORITY.get(intent, 0)
         for keyword in keywords:
             if keyword in query:
-                # Store (Priority, Length, Intent)
                 matches.append((priority, len(keyword), intent))
     
     if not matches:
         return "unknown"
         
-    # Sort by Priority (Primary) and Length (Secondary)
     matches.sort(key=lambda x: (x[0], x[1]), reverse=True)
     return matches[0][2]
 
 def get_intent(query):
     """
-    Main entry point for V2 bypass. Extracts intent and parameters.
+    Main entry point for V2 bypass.
     """
     intent = map_intent(query)
     
@@ -129,30 +78,10 @@ def get_intent(query):
         return {
             "intent": "unknown",
             "params": {},
-            "message": "Query not supported in V2 templates. Please ask about total revenue, regions, top products, or sales offices."
+            "message": "Query not supported. Ask for 'total revenue', 'top products', 'price analysis', or 'transaction view'."
         }
         
-    params = {}
-    
-    # PARAMETER EXTRACTION: Sales Office
-    if intent == "sales_office_customer_revenue":
-        # Sort offices by length descending to match most specific first (e.g. 'Ahmedabad City' vs 'Ahmedabad')
-        sorted_offices = sorted(SALES_OFFICES, key=len, reverse=True)
-        # Look for recognized office names in the query
-        for office in sorted_offices:
-            if office.lower() in query.lower():
-                params["sales_office"] = office
-                break
-        
-        # Fallback: if no office mentioned, switch to list_sales_offices to help user
-        if "sales_office" not in params:
-            return {
-                "intent": "list_sales_offices",
-                "params": {},
-                "message": "You didn't specify a sales office. Here are the available offices to choose from:"
-            }
-
     return {
         "intent": intent,
-        "params": params
+        "params": {}
     }

@@ -139,38 +139,77 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
     pipeline_start = time.time()
 
     # ENTRY LOGGING: See exactly what Orchestrate sent
-    print("\n" + "=" * 30)
-    print(f"[*] INCOMING REQUEST FROM ORCHESTRATE")
-    print(f"[*] PAYLOAD: {request.dict()}")
-    print("=" * 30 + "\n")
-
     try:
-        # [POC V2 BYPASS] Pure Sales Math Fast Path
+        # [HOT RELOAD] Force refresh mapping logic to prevent stale dev state
+        import importlib
+        from . import mapping_v2
+        importlib.reload(mapping_v2)
+        from .mapping_v2 import get_intent
+
         v2_match = get_intent(request.query)
         if v2_match and v2_match.get("intent") != "unknown":
-            print(f"!!! [POC V2 BYPASS] Matched to V2 Intent: {v2_match['intent']}")
             v2_intent = v2_match["intent"]
-            v2_params = v2_match["params"]
+            v2_params = v2_match.get("params", {})
+            logger.info(f"!!! [POC V2 BYPASS] Matched to V2 Intent: {v2_intent}")
             
             # Execute V2 (Fast Track)
-            v2_data = execute_query(intent=v2_intent, params=v2_params)
-            
-            # Narrate V2
-            v2_answer = narrate({"intent": v2_intent, "params": v2_params}, v2_data)
-            
-            pipeline_ms = round((time.time() - pipeline_start) * 1000)
-            return FullResponse(
-                plan=PlanResponse(intent=v2_intent, params=v2_params, mode="v2_pure_math", confidence=1.0, reliability_level=ReliabilityLevel.HIGH, original_query=request.query),
-                data=v2_data,
-                answer=f"[POC V2 PURE MATH]\n\n{v2_answer}",
-                pipeline_ms=pipeline_ms
+            executor_result = execute_query(
+                intent=v2_intent, 
+                params=v2_params
             )
+            
+            if executor_result["status"] == "success":
+                # Narrate using the standard narrate function
+                # We wrap intent/params in a dict to match the 'plan' expected by narrate()
+                v2_plan_dict = {
+                    "intent": v2_intent, 
+                    "params": v2_params, 
+                    "original_query": request.query
+                }
+                v2_answer = narrate(v2_plan_dict, executor_result)
+                
+                pipeline_ms = round((time.time() - pipeline_start) * 1000)
+                return FullResponse(
+                    plan=PlanResponse(
+                        intent=v2_intent, 
+                        params=v2_params, 
+                        mode="v2_pure_math", 
+                        confidence=1.0, 
+                        reliability_level=ReliabilityLevel.HIGH, 
+                        original_query=request.query
+                    ),
+                    data=executor_result,
+                    answer=v2_answer,
+                    pipeline_ms=pipeline_ms
+                )
+            else:
+                # Execution failed - return error
+                pipeline_ms = round((time.time() - pipeline_start) * 1000)
+                return FullResponse(
+                    plan=PlanResponse(
+                        intent=v2_intent, 
+                        params=v2_params, 
+                        mode="v2_pure_math", 
+                        confidence=1.0, 
+                        reliability_level=ReliabilityLevel.HIGH, 
+                        original_query=request.query
+                    ),
+                    data=executor_result,
+                    answer=f"I couldn't retrieve the data. Error: {executor_result.get('message')}. Please try rephrasing your question.",
+                    pipeline_ms=pipeline_ms
+                )
         else:
-            # User requested to bypass advanced intelligence completely.
             # If no V2 match, we return an error rather than falling back to LLM.
             pipeline_ms = round((time.time() - pipeline_start) * 1000)
             return FullResponse(
-                plan=PlanResponse(intent="unsupported", params={}, mode="v2_pure_math", confidence=0.0, reliability_level=ReliabilityLevel.LOW, original_query=request.query),
+                plan=PlanResponse(
+                    intent="unsupported", 
+                    params={}, 
+                    mode="v2_pure_math", 
+                    confidence=0.0, 
+                    reliability_level=ReliabilityLevel.LOW, 
+                    original_query=request.query
+                ),
                 data={"status": "error", "message": "Query not supported in pure V2 mode."},
                 answer="I am currently in 'Pure Sales Mode' and can only answer predefined queries about revenue, regions, monthly trends, and top products. Please try rephrasing or ask about 'total revenue'.",
                 pipeline_ms=pipeline_ms

@@ -22,7 +22,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Default model — High-Reasoning Tier
-DEFAULT_MODEL = "meta-llama/llama-3-1-70b-instruct" # Switched to 70B model to kill hallucinations
+DEFAULT_MODEL = "meta-llama/llama-3-3-70b-instruct" # Switched to 3.3-70B model (supported in eu-de)
 
 # SDK-level objects — lazy-initialized
 _credentials = None
