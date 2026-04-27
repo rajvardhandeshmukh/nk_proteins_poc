@@ -165,10 +165,13 @@ def validate_schema():
         for key, col in column_map.items():
             try:
                 # Optimized check: SELECT TOP 1 is fast and safe for existence check
-                conn.execute(text(f"SELECT TOP 1 {col} FROM {table}"))
+                # Wrap in brackets to handle spaces in column/table names
+                safe_col = f"[{col}]" if not col.startswith("[") else col
+                safe_table = f"[{table}]" if not table.startswith("[") else table
+                conn.execute(text(f"SELECT TOP 1 {safe_col} FROM {safe_table}"))
                 logger.info(f"  [PASS] Column '{key}' -> '{col}' verified.")
             except Exception as e:
-                logger.error(f"  [FAIL] Column '{key}' -> '{col}' NOT FOUND in table '{table}'.")
+                logger.error(f"  [FAIL] Column '{key}' -> '{col}' NOT FOUND in table '{table}'. Error: {e}")
                 failed_cols.append(f"{key}:{col}")
     
     if failed_cols:
