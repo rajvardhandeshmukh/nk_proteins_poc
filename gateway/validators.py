@@ -7,6 +7,7 @@ Catches misspelled filters and wrong data types BEFORE they hit SQL.
 import os
 import logging
 import pandas as pd
+import re
 from difflib import SequenceMatcher
 from urllib.parse import quote_plus
 from sqlalchemy import create_engine
@@ -145,3 +146,25 @@ def validate_and_correct_params(intent: str, params: dict, template_config: dict
             corrected[param_name] = corrected_val
 
     return corrected
+
+def validate_and_constrain_sql(sql: str) -> str:
+    """
+    Ensures generated SQL is read-only and limited.
+    Blocks: DROP, DELETE, INSERT, UPDATE, TRUNCATE, EXEC.
+    """
+    sql_upper = sql.upper().strip()
+    
+    # 1. Block dangerous keywords
+    forbidden = ["DROP", "DELETE", "INSERT", "UPDATE", "TRUNCATE", "EXEC", "ALTER"]
+    for word in forbidden:
+        if re.search(rf"\b{word}\b", sql_upper):
+            raise ValueError(f"Unsafe keyword detected: {word}")
+
+    # 2. Enforce READ-ONLY (must start with SELECT or WITH)
+    if not (sql_upper.startswith("SELECT") or sql_upper.startswith("WITH")):
+        raise ValueError("Queries must start with SELECT or WITH.")
+
+    # 3. Strip trailing semicolon
+    sql = sql.strip().rstrip(";")
+    
+    return sql

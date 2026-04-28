@@ -11,9 +11,8 @@ import os
 import logging
 from .llm_client import call_llm
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from hub.config import SQL_SCHEMA
-from hub.utils import validate_and_constrain_sql
+from .config import SQL_SCHEMA
+from .validators import validate_and_constrain_sql
 
 logger = logging.getLogger(__name__)
 

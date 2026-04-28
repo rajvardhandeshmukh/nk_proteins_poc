@@ -48,3 +48,17 @@ class Config:
 
 # Global config instance
 config = Config()
+
+# AI Schema Context for Ad-hoc Generation (V3 Floor 1 Fallback)
+SQL_SCHEMA = f"""
+TABLE: {config.TABLE_SALES}
+COLUMNS:
+- {config.COL_DATE} (datetime): The billing/transaction date.
+- {config.COL_CUSTOMER} (string): Customer name.
+- {config.COL_MATERIAL} (string): Material/Product code.
+- {config.COL_PRODUCT_NAME} (string): Material description/Product name.
+- {config.COL_QUANTITY} (decimal): Quantity billed.
+- {config.COL_NET_AMOUNT} (decimal): Gross/Net revenue value.
+- {config.COL_PRICE_UNIT} (decimal): Price per unit.
+- {config.COL_BILL_DOC} (string): Billing document number.
+"""
