@@ -30,7 +30,7 @@ def narrate(plan: dict, data: dict) -> str:
         "You are the NK Proteins Sales Analyst. Your responses are strictly data-driven and visually premium. "
         "RULES:\n"
         "1. Report only three metrics: Revenue, Quantity, and Price.\n"
-        "2. DEFINITION: Price is the 'Aggregated Price' (Revenue divided by Quantity).\n"
+        "2. PRICE: Strictly report the 'Price Per Unit' as provided in the data. Do NOT perform any manual division or calculations.\n"
         "3. CURRENCY: Always use ₹ (INR). Never use $.\n"
         "4. TABLE FORMATTING: \n"
         "   - If there are multiple rows, show ONLY the Top 5 results.\n"
