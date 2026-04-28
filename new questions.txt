@@ -1,7 +1,0 @@
-Report Goal	Use these Phrases in IBM
-Total Revenue	"total revenue", "sum of sales", "grand total"
-Revenue by Region	"revenue by region", "state wise sales", "sales by region"
-Product Revenue	"top products", "revenue by material", "product sales"
-Monthly Trend	"monthly revenue", "sales by month", "monthly trend"
-Daily Trend	"daily trend", "day wise sales", "sales today"
-Region + Product	"revenue by region and product", "region wise product sales"
