@@ -25,9 +25,8 @@ from .planner import plan_query
 from .llm_planner import plan_query_llm
 from .llm_sql import generate_sql_dynamic
 from .narrator import narrate
-from .sql_templates_v2 import SQL_TEMPLATES
-VALID_INTENTS = list(SQL_TEMPLATES.keys())
-from .mapping_v2 import get_intent
+from .domains import registry
+VALID_INTENTS = list(registry.get_all_templates().keys())
 from .validators import load_entity_cache
 from .telemetry import log_error, log_plan, log_narration
 from .governance import get_reliability, get_governance_notes, detect_conflicts, ReliabilityLevel
@@ -105,6 +104,10 @@ class ExecuteRequest(BaseModel):
         description="Parameters to fill into the SQL template",
         examples=[{"months_back": 6, "region": "Gujarat"}],
     )
+    domain: Optional[str] = Field(
+        default="sales",
+        description="The data domain (e.g. sales, inventory)"
+    )
     data_source_verification: str = Field(
         default="ERP_V3",
         description="MANDATORY verification tag"
@@ -140,29 +143,30 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
 
     # ENTRY LOGGING: See exactly what Orchestrate sent
     try:
-        # [HOT RELOAD] Force refresh mapping logic to prevent stale dev state
+        # [MODULAR DOMAIN ROUTING]
+        from .domains import registry
         import importlib
-        from . import mapping_v2
-        importlib.reload(mapping_v2)
-        from .mapping_v2 import get_intent
-
-        v2_match = get_intent(request.query)
-        if v2_match and v2_match.get("intent") != "unknown":
-            v2_intent = v2_match["intent"]
-            v2_params = v2_match.get("params", {})
-            logger.info(f"!!! [POC V2 BYPASS] Matched to V2 Intent: {v2_intent}")
+        importlib.reload(registry) # Force reload for dev
+        
+        route_match = registry.route_query(request.query)
+        if route_match["intent"] != "unknown":
+            intent = route_match["intent"]
+            params = route_match["params"]
+            domain = route_match["domain"]
+            logger.info(f"!!! [DOMAIN ROUTING] Matched {domain} -> {intent}")
             
-            # Execute V2 (Fast Track)
+            # Execute
             executor_result = execute_query(
-                intent=v2_intent, 
-                params=v2_params
+                intent=intent, 
+                params=params,
+                domain=domain
             )
             
             if executor_result["status"] == "success":
                 # Narrate using the standard narrate function
                 # We wrap intent/params in a dict to match the 'plan' expected by narrate()
                 v2_plan_dict = {
-                    "intent": v2_intent, 
+                    "intent": intent, 
                     "params": v2_params, 
                     "original_query": request.query
                 }
@@ -280,7 +284,11 @@ def api_execute_query(request: ExecuteRequest, x_api_key: str = Header(None)):
             detail=f"Unknown intent: '{request.intent}'. Valid intents: {VALID_INTENTS}"
         )
 
-    result = execute_query(intent=request.intent, params=request.params)
+    result = execute_query(
+        intent=request.intent, 
+        params=request.params,
+        domain=request.domain
+    )
     return ExecuteResponse(**result)
 
 @app.post("/top_products", response_model=FullResponse)
@@ -290,7 +298,11 @@ def api_top_products(request: ExecuteRequest, x_api_key: str = Header(None)):
     pipeline_start = time.time()
     effective_intent = request.intent if request.intent else "top_products"
     plan = {"intent": effective_intent, "params": request.params, "mode": "template"}
-    data = execute_query(intent=effective_intent, params=request.params)
+    data = execute_query(
+        intent=effective_intent, 
+        params=request.params,
+        domain=request.domain
+    )
     answer = narrate(plan, data)
     pipeline_ms = round((time.time() - pipeline_start) * 1000)
     return FullResponse(plan=plan, data=data, answer=answer, pipeline_ms=pipeline_ms)
@@ -302,7 +314,11 @@ def api_region_comparison(request: ExecuteRequest, x_api_key: str = Header(None)
     pipeline_start = time.time()
     effective_intent = request.intent if request.intent else "region_comparison"
     plan = {"intent": effective_intent, "params": request.params, "mode": "template"}
-    data = execute_query(intent=effective_intent, params=request.params)
+    data = execute_query(
+        intent=effective_intent, 
+        params=request.params,
+        domain=request.domain
+    )
     answer = narrate(plan, data)
     pipeline_ms = round((time.time() - pipeline_start) * 1000)
     return FullResponse(plan=plan, data=data, answer=answer, pipeline_ms=pipeline_ms)
@@ -314,7 +330,11 @@ def api_revenue_trend(request: ExecuteRequest, x_api_key: str = Header(None)):
     pipeline_start = time.time()
     effective_intent = request.intent if request.intent else "revenue_trend"
     plan = {"intent": effective_intent, "params": request.params, "mode": "template"}
-    data = execute_query(intent=effective_intent, params=request.params)
+    data = execute_query(
+        intent=effective_intent, 
+        params=request.params,
+        domain=request.domain
+    )
     answer = narrate(plan, data)
     pipeline_ms = round((time.time() - pipeline_start) * 1000)
     return FullResponse(plan=plan, data=data, answer=answer, pipeline_ms=pipeline_ms)

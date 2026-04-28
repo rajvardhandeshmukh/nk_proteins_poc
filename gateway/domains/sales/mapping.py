@@ -1,8 +1,7 @@
-# Intent Mapping for Pure Sales Mode (V2 - Ground Truth Protocol V3)
+# Intent Mapping for Sales Domain
 import logging
 logger = logging.getLogger(__name__)
 
-# Priority: Drilldowns and Analysis first
 INTENT_PRIORITY = {
     "customer_product_revenue": 10,
     "product_price_analysis": 8,
@@ -16,7 +15,6 @@ INTENT_PRIORITY = {
     "total_revenue": 1,
 }
 
-# EXACT USER MAPPING V3
 INTENT_MAP = {
     "total_revenue": [
         "total revenue", "total sales", "overall revenue"
@@ -46,13 +44,12 @@ INTENT_MAP = {
         "top customers", "best customers"
     ],
     "transaction_view": [
-        "show transactions", "raw data"
+        "show transactions", "raw data", "raw transaction", "transaction data"
     ]
 }
 
 def map_intent(query):
     query = query.lower()
-    
     matches = []
     for intent, keywords in INTENT_MAP.items():
         priority = INTENT_PRIORITY.get(intent, 0)
@@ -63,23 +60,17 @@ def map_intent(query):
     if not matches:
         return "unknown"
         
-    # Sort by priority, then by keyword length to get most specific match
     matches.sort(key=lambda x: (x[0], x[1]), reverse=True)
     return matches[0][2]
 
 def get_intent(query):
-    """
-    Main entry point for V2 bypass.
-    """
     intent = map_intent(query)
-    
     if intent == "unknown":
         return {
             "intent": "unknown",
             "params": {},
             "message": "Query not supported. Try 'total sales', 'product price', or 'raw data'."
         }
-        
     return {
         "intent": intent,
         "params": {}

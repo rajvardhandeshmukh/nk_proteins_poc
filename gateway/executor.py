@@ -21,11 +21,9 @@ from urllib.parse import quote_plus
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 
-import importlib
-from . import sql_templates
-from . import sql_templates_v2
 from . import validators
 from .telemetry import log_query, log_error
+from .domains import registry
 
 logger = logging.getLogger(__name__)
 
@@ -74,32 +72,30 @@ def get_engine(force_new=False):
 # QUERY BUILDER (Safe Template Filler)
 # =============================================================================
 
-def _build_query(intent: str, params: dict) -> tuple[str, dict]:
+def _build_query(intent: str, params: dict, domain: str = None) -> tuple[str, dict]:
     """
     Takes an intent name and user params.
     Returns (filled_sql_string, safe_params_dict).
     """
-    # [POC V2 BYPASS] Check V2 Templates FIRST
-    print(f"!!! [DEBUG] _build_query called with intent: '{intent}'")
-    if hasattr(sql_templates_v2, 'SQL_TEMPLATES'):
-        print(f"!!! [DEBUG] V2 Templates Available: {list(sql_templates_v2.SQL_TEMPLATES.keys())}")
-        if intent in sql_templates_v2.SQL_TEMPLATES:
-            query = sql_templates_v2.SQL_TEMPLATES[intent]
-            # Direct Ground-Truth Reference
-            query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
-            return query.strip(), params
-    else:
-        print("!!! [DEBUG] sql_templates_v2 has NO SQL_TEMPLATES attribute!")
+    # 1. Try the Registry (New Modular Domain Path)
+    query = registry.get_template(domain, intent) if domain else None
+    
+    # 2. Global Registry Fallback (if domain is unknown)
+    if not query:
+        all_tmpls = registry.get_all_templates()
+        query = all_tmpls.get(intent)
 
-    if intent not in sql_templates.SQL_TEMPLATES:
-        # If it's the specific V2 'unknown' intent, provide a clean message
-        if intent == "unknown":
-            raise ValueError("This query is not yet supported in the standardized V2 Sales Mode.")
-        # Otherwise, fall back to listing only the V2 intents if possible
-        valid_v2 = list(sql_templates_v2.SQL_TEMPLATES.keys())
-        raise ValueError(f"Intent '{intent}' not recognized. Standardized V2 reports available: {valid_v2}")
+    if query:
+        return query.strip(), params
 
-    template = sql_templates.SQL_TEMPLATES[intent]
+    # 3. Legacy Fallback
+    from . import sql_templates
+    if intent in sql_templates.SQL_TEMPLATES:
+        template = sql_templates.SQL_TEMPLATES[intent]
+        return template.strip(), params
+
+    # Final Failure
+    raise ValueError(f"Intent '{intent}' (Domain: {domain}) not recognized in any registered domain.")
 
     # Step 1: Validate types + fuzzy-correct entity names
     safe_params = validators.validate_and_correct_params(intent, params, template)
@@ -123,14 +119,6 @@ def _build_query(intent: str, params: dict) -> tuple[str, dict]:
                 query = query.replace(f"{{{filter_key}}}", "")
         else:
             query = query.replace(f"{{{filter_key}}}", "")
-
-    # MOP-UP: Force Absolute Ground-Truth Reference
-    # Since we rebuilt fact tables from scratch, we use the normalized base tables.
-    query = query.replace("fact_sales", "[nk_proteins].[dbo].[fact_sales]")
-    query = query.replace("fact_inventory", "[nk_proteins].[dbo].[fact_inventory]")
-    query = query.replace("fact_cashflow", "[nk_proteins].[dbo].[fact_cashflow]")
-    query = query.replace("fact_profitability", "[nk_proteins].[dbo].[fact_profitability]")
-    query = query.replace("fact_bom", "[nk_proteins].[dbo].[fact_bom]")
 
     return query.strip(), safe_params
 
@@ -182,7 +170,7 @@ def validate_schema():
     _SCHEMA_VALIDATED = True
     logger.info("!!! [SCHEMA VALIDATION] All columns verified successfully.")
 
-def execute_query(intent: str, params: dict) -> dict:
+def execute_query(intent: str, params: dict, domain: str = None) -> dict:
     """
     The main entry point for Floor 2.
     """
@@ -196,7 +184,7 @@ def execute_query(intent: str, params: dict) -> dict:
 
     # 1. Build the safe query
     try:
-        sql, safe_params = _build_query(intent, params)
+        sql, safe_params = _build_query(intent, params, domain=domain)
     except ValueError as e:
         elapsed_ms = round((time.time() - start) * 1000)
         log_query(intent=intent, query="", params=params, row_count=0, latency_ms=elapsed_ms, status=f"validation_error: {e}")

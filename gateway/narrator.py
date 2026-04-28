@@ -14,6 +14,10 @@ def narrate(plan: dict, data: dict) -> str:
     row_count = data.get("row_count", 0)
     status = data.get("status", "error")
 
+    # 0. Specialized View Bypass (Prevents Hallucination for Raw Data)
+    if intent == "transaction_view":
+        return f"I have retrieved the latest {row_count} transactions from the database as requested."
+
     # 1. Error Handling
     if status == "error":
         return f"I encountered an error while processing your request: {data.get('message', 'System busy')}. Please try again."
@@ -38,8 +42,13 @@ def narrate(plan: dict, data: dict) -> str:
     total_rev = 0
     total_qty = 0
     for r in rows:
-        total_rev += float(r.get("Revenue", 0))
-        total_qty += float(r.get("Quantity", 0))
+        # Flexible mapping for Revenue
+        rev_val = r.get("Total Revenue") or r.get("Gross Value") or r.get("Revenue") or 0
+        total_rev += float(rev_val)
+        
+        # Flexible mapping for Quantity
+        qty_val = r.get("Total Quantity") or r.get("Bill Qty") or r.get("Quantity") or 0
+        total_qty += float(qty_val)
 
     user_prompt = (
         f"Intent: {intent}\n"
