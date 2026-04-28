@@ -167,7 +167,7 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
                 # We wrap intent/params in a dict to match the 'plan' expected by narrate()
                 v2_plan_dict = {
                     "intent": intent, 
-                    "params": v2_params, 
+                    "params": params, 
                     "original_query": request.query
                 }
                 v2_answer = narrate(v2_plan_dict, executor_result)
@@ -175,9 +175,9 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
                 pipeline_ms = round((time.time() - pipeline_start) * 1000)
                 return FullResponse(
                     plan=PlanResponse(
-                        intent=v2_intent, 
-                        params=v2_params, 
-                        mode="v2_pure_math", 
+                        intent=intent, 
+                        params=params, 
+                        mode="template", 
                         confidence=1.0, 
                         reliability_level=ReliabilityLevel.HIGH, 
                         original_query=request.query
@@ -191,9 +191,9 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
                 pipeline_ms = round((time.time() - pipeline_start) * 1000)
                 return FullResponse(
                     plan=PlanResponse(
-                        intent=v2_intent, 
-                        params=v2_params, 
-                        mode="v2_pure_math", 
+                        intent=intent, 
+                        params=params, 
+                        mode="template", 
                         confidence=1.0, 
                         reliability_level=ReliabilityLevel.HIGH, 
                         original_query=request.query
@@ -209,7 +209,7 @@ def api_query(request: QueryRequest, x_api_key: str = Header(None)):
                 plan=PlanResponse(
                     intent="unsupported", 
                     params={}, 
-                    mode="v2_pure_math", 
+                    mode="registry", 
                     confidence=0.0, 
                     reliability_level=ReliabilityLevel.LOW, 
                     original_query=request.query
