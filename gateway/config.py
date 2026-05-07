@@ -51,9 +51,13 @@ class Config:
         self.COL_CHANNEL        = "channel"         # DistributionChannelText
         self.COL_DIVISION_CODE  = "division_code"   # Divison
         self.COL_DIVISION       = "division"        # DivisionText
+        # Sales Office (NEW v2.1)
+        self.COL_SALES_OFFICE_CODE = "sales_office_code" # SalesOffice
+        self.COL_SALES_OFFICE      = "sales_office"      # SalesOfficeText
         # Plant
         self.COL_PLANT          = "plant"           # PlantName
         self.COL_PLANT_CITY     = "plant_city"      # PlantCityName
+        self.COL_BILL_DOC_TYPE  = "bill_doc_type_text" # BillingDocumentTypeText
 
     def get_column_map(self):
         """
@@ -74,8 +78,10 @@ class Config:
             "COST":         self.COL_COST,
             "MARGIN_PCT":   self.COL_MARGIN_PCT,
             "SALES_ORG":    self.COL_SALES_ORG,
+            "SALES_OFFICE": self.COL_SALES_OFFICE,
             "PLANT":        self.COL_PLANT,
             "PLANT_CITY":   self.COL_PLANT_CITY,
+            "DOC_TYPE":     self.COL_BILL_DOC_TYPE,
         }
 
 
@@ -106,17 +112,20 @@ COLUMNS (use EXACTLY these names in SQL):
   margin_pct     (decimal)   Gross margin % (GrossMarginPercentageINR)
   sales_org_code (string)    Sales organization code
   sales_org      (string)    Sales organization name
+  sales_office_code (string) Sales office code
+  sales_office      (string) Sales office name (e.g., Ahmedabad, Mumbai)
   channel_code   (string)    Distribution channel code
   channel        (string)    Distribution channel name
   division_code  (string)    Division code
   division       (string)    Division name
   plant          (string)    Plant name
   plant_city     (string)    Plant city
+  bill_doc_type_text (string) Invoice or Return
 
 RULES:
-  R1: SUM(revenue) -- always INR, never other amounts
+  R1: SUM(revenue) AS total_revenue -- always INR, never other amounts
   R2: GROUP BY unit when querying quantity -- never mix KG + LTR
-  R3: GROUP BY product_id, product_name (both, always)
+  R3: GROUP BY product_name (always)
   R4: GROUP BY customer_id, customer_name (both, always)
-  R5: No date filters -- data is already MTD Feb 1-15
+  R5: ALWAYS use WHERE event_date >= :start_date AND event_date <= :end_date
 """

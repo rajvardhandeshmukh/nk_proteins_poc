@@ -11,12 +11,13 @@ SQL_TEMPLATES = {
     "revenue_by_region": f"""
         SELECT
             region,
-            SUM(revenue)              AS revenue,
-            COUNT(DISTINCT bill_doc)  AS invoice_count
+            SUM(revenue)              AS total_revenue,
+            COUNT(DISTINCT bill_doc)  AS invoice_count,
+            COUNT(*)                  AS line_item_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
         GROUP BY region
-        ORDER BY revenue DESC;
+        ORDER BY total_revenue DESC;
     """,
 
     # 2. Revenue by Customer
@@ -25,40 +26,41 @@ SQL_TEMPLATES = {
             customer_id,
             customer_name,
             region,
-            SUM(revenue)              AS revenue,
-            COUNT(DISTINCT bill_doc)  AS invoice_count
+            SUM(revenue)              AS total_revenue,
+            COUNT(DISTINCT bill_doc)  AS invoice_count,
+            COUNT(*)                  AS line_item_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
         GROUP BY customer_id, customer_name, region
-        ORDER BY revenue DESC;
+        ORDER BY total_revenue DESC;
     """,
 
     # 3. Revenue by Product (Unit Safe -- grouped by unit to prevent mixing KG+LTR)
     "revenue_by_product": f"""
         SELECT
-            product_id,
             product_name,
             unit,
-            SUM(revenue)   AS revenue,
-            SUM(quantity)  AS total_quantity
+            SUM(revenue)              AS total_revenue,
+            SUM(quantity)             AS total_quantity,
+            COUNT(DISTINCT bill_doc)  AS invoice_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
-        GROUP BY product_id, product_name, unit
-        ORDER BY revenue DESC;
+        GROUP BY product_name, unit
+        ORDER BY total_revenue DESC;
     """,
 
     # 4. Product by Plant
     "product_by_plant": f"""
         SELECT
-            product_id,
             product_name,
             plant,
             unit,
-            SUM(revenue)  AS revenue
+            SUM(revenue)  AS total_revenue,
+            SUM(quantity) AS total_quantity
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
-        GROUP BY product_id, product_name, plant, unit
-        ORDER BY revenue DESC;
+        GROUP BY product_name, plant, unit
+        ORDER BY total_revenue DESC;
     """,
 
     # 5. Revenue by Sales Org
@@ -66,33 +68,37 @@ SQL_TEMPLATES = {
         SELECT
             sales_org_code,
             sales_org,
-            SUM(revenue)  AS revenue
+            SUM(revenue)  AS total_revenue,
+            COUNT(*)      AS line_item_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
         GROUP BY sales_org_code, sales_org
-        ORDER BY revenue DESC;
+        ORDER BY total_revenue DESC;
     """,
 
     # 6. Customer x Product (cross analysis)
     "customer_product_revenue": f"""
-        SELECT
+        SELECT TOP 20
             customer_id,
             customer_name,
             product_id,
             product_name,
-            SUM(revenue)  AS revenue
+            unit,
+            SUM(revenue)  AS total_revenue,
+            COUNT(*)      AS line_item_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
-        GROUP BY customer_id, customer_name, product_id, product_name
-        ORDER BY revenue DESC;
+        GROUP BY customer_id, customer_name, product_id, product_name, unit
+        ORDER BY total_revenue DESC;
     """,
 
     # 7. Daily Revenue Trend (MTD)
     "daily_revenue_trend": f"""
         SELECT
             event_date,
-            SUM(revenue)             AS revenue,
-            COUNT(DISTINCT bill_doc) AS invoice_count
+            SUM(revenue)             AS total_revenue,
+            COUNT(DISTINCT bill_doc) AS invoice_count,
+            COUNT(*)                 AS line_item_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
         GROUP BY event_date
@@ -104,8 +110,9 @@ SQL_TEMPLATES = {
         SELECT
             SUM(revenue)              AS total_revenue,
             SUM(cost)                 AS total_cost,
-            AVG(margin_pct)           AS avg_margin_pct,
+            SUM(revenue - cost) * 100.0 / NULLIF(SUM(revenue), 0) AS weighted_margin_pct,
             COUNT(DISTINCT bill_doc)  AS invoice_count,
+            COUNT(*)                  AS line_item_count,
             COUNT(DISTINCT customer_id) AS customer_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date;
@@ -117,12 +124,13 @@ SQL_TEMPLATES = {
             product_id,
             product_name,
             unit,
-            SUM(revenue)  AS revenue,
-            SUM(quantity) AS total_quantity
+            SUM(revenue)  AS total_revenue,
+            SUM(quantity) AS total_quantity,
+            COUNT(*)      AS line_item_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
         GROUP BY product_id, product_name, unit
-        ORDER BY revenue DESC;
+        ORDER BY total_revenue DESC;
     """,
 
     # 10. Top 10 Customers by Revenue
@@ -131,11 +139,26 @@ SQL_TEMPLATES = {
             customer_id,
             customer_name,
             region,
-            SUM(revenue)             AS revenue,
-            COUNT(DISTINCT bill_doc) AS invoice_count
+            SUM(revenue)             AS total_revenue,
+            COUNT(DISTINCT bill_doc) AS invoice_count,
+            COUNT(*)                 AS line_item_count
         FROM sales_clean
         WHERE event_date >= :start_date AND event_date <= :end_date
         GROUP BY customer_id, customer_name, region
-        ORDER BY revenue DESC;
+        ORDER BY total_revenue DESC;
+    """,
+
+    # 11. Revenue by Sales Office
+    "revenue_by_sales_office": f"""
+        SELECT
+            sales_office_code,
+            sales_office,
+            SUM(revenue)              AS total_revenue,
+            COUNT(DISTINCT bill_doc)  AS invoice_count,
+            COUNT(*)                  AS line_item_count
+        FROM sales_clean
+        WHERE event_date >= :start_date AND event_date <= :end_date
+        GROUP BY sales_office_code, sales_office
+        ORDER BY total_revenue DESC;
     """,
 }

@@ -22,7 +22,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Default model — High-Reasoning Tier
-DEFAULT_MODEL = "ibm/granite-3-8b-instruct"
+DEFAULT_MODEL = "meta-llama/llama-3-3-70b-instruct"
 
 
 # SDK-level objects — lazy-initialized

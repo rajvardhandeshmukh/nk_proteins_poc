@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 INTENT_PRIORITY = {
     "customer_product_revenue": 10,
     "product_by_plant":          9,
+    "revenue_by_sales_office":   8,
     "revenue_by_region":         8,
     "revenue_by_sales_org":      8,
     "daily_revenue_trend":       7,
@@ -41,6 +42,10 @@ INTENT_MAP = {
     "revenue_by_sales_org": [
         "sales org", "sales organization", "by sales org",
         "which sales org", "sales org breakdown",
+    ],
+    "revenue_by_sales_office": [
+        "sales office", "by sales office", "office wise", "officewise",
+        "sales office breakdown", "which sales office", "office performance",
     ],
     "customer_product_revenue": [
         "customer product", "product by customer", "customer and product",

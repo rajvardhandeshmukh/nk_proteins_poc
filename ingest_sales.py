@@ -164,7 +164,10 @@ SELECT
     DivisionText             AS division,
     -- Plant
     PlantName                AS plant,
-    PlantCityName            AS plant_city
+    PlantCityName            AS plant_city,
+    -- Doc Type
+    BillingDocumentType      AS bill_doc_type,
+    BillingDocumentTypeText  AS bill_doc_type_text
 FROM fact_sales;
 """
 

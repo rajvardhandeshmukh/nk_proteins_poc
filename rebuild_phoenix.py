@@ -29,7 +29,7 @@ def get_engine():
     params = quote_plus(f"DRIVER={{{driver}}};SERVER={server};DATABASE={database};UID={user};PWD={password}")
     conn_str = f"mssql+pyodbc:///?odbc_connect={params}"
     
-    return create_engine(conn_str)
+    return create_engine(conn_str, fast_executemany=True)
 
 # =============================================================================
 # 2. NORMALIZATION UTILS
@@ -51,127 +51,102 @@ def parse_date(date_val):
     if pd.isna(date_val) or date_val == '':
         return None
     try:
+        # Handle YYYYMMDD format from SAP
+        s = str(date_val).strip()
+        if len(s) == 8 and s.isdigit():
+            return pd.to_datetime(s, format='%Y%m%d')
         return pd.to_datetime(date_val, dayfirst=True)
     except:
         return pd.to_datetime(date_val, errors='coerce')
 
 # =============================================================================
-# 3. SCHEMA DEFINITION & PURGE
-# =============================================================================
-
-def purge_and_create_tables(engine):
-    tables = [
-        "fact_sales"
-        # "fact_inventory",
-        # "fact_profitability",
-        # "fact_cashflow",
-        # "fact_bom"
-    ]
-    
-    with engine.begin() as conn:
-        for table in tables:
-            logger.info(f"Dropping table if exists: {table}")
-            conn.execute(text(f"IF OBJECT_ID('{table}', 'U') IS NOT NULL DROP TABLE {table}"))
-
-        # Create fact_sales (Updated 33-column SAP Schema)
-        logger.info("Creating table: fact_sales")
-        conn.execute(text("""
-            CREATE TABLE fact_sales (
-                BillingDocument NVARCHAR(50),
-                BillingDocumentItem NVARCHAR(10),
-                BillingDocumentDate DATE,
-                Material NVARCHAR(18),
-                MaterialGroup NVARCHAR(50),
-                MaterialGroupName NVARCHAR(100),
-                MaterialType NVARCHAR(50),
-                MaterialTypeName NVARCHAR(100),
-                ProductName NVARCHAR(255),
-                SalesOrganization NVARCHAR(50),
-                SalesOrganizationName NVARCHAR(100),
-                DistributionChannel NVARCHAR(50),
-                DistributionChannelName NVARCHAR(100),
-                Division NVARCHAR(50),
-                DivisionName NVARCHAR(100),
-                SalesOffice NVARCHAR(50),
-                SalesOfficeName NVARCHAR(100),
-                Plant NVARCHAR(50),
-                PlantName NVARCHAR(100),
-                PlantCityName NVARCHAR(100),
-                PlantStreetName NVARCHAR(255),
-                PlantPostalCode NVARCHAR(20),
-                SoldToParty NVARCHAR(50),
-                CustomerName NVARCHAR(255),
-                CustomerRegionName NVARCHAR(100),
-                ProfitCenter NVARCHAR(50),
-                ProfitCenterName NVARCHAR(100),
-                BillingQuantity DECIMAL(18,3),
-                BillingQuantityUnit NVARCHAR(20),
-                TransactionCurrency NVARCHAR(10),
-                NetAmount DECIMAL(18,2),
-                CostAmount DECIMAL(18,2),
-                GrossMargin DECIMAL(18,2)
-            )
-        """))
-
-        # [SALES ONLY] Skipping Inventory, Profitability, Cashflow, and BOM creations.
-        """
-        # Create fact_inventory
-        logger.info("Creating table: fact_inventory")
-        conn.execute(text(\"\"\"
-            CREATE TABLE fact_inventory (
-                ...
-            )
-        \"\"\"))
-        ...
-        """
-
-# =============================================================================
-# 4. DATA LOADING
+# 3. DATA LOADING
 # =============================================================================
 
 def load_data(engine):
     logger.info("Starting data ingestion with USN normalization...")
 
-    # 1. SALES (New Integrated Profitability & Sales Data)
-    f_sales = "data/NK_Proteins_Sales_Profitability_Data_20250201_to_20250228_v1.csv"
+    # 1. SALES
+    f_sales = "data/NK_Proteins_Sales_Data_20250201_to_20250215_v2_modified (2).csv"
     if os.path.exists(f_sales):
-        logger.info(f"Loading Sales (Integrated) from {f_sales}")
-        df = pd.read_csv(f_sales)
+        logger.info(f"Loading Sales from {f_sales}")
+        df = pd.read_csv(f_sales, low_memory=False)
+        df.columns = [c.strip() for c in df.columns]
         
         # Date Parsing
         df['BillingDocumentDate'] = df['BillingDocumentDate'].apply(parse_date)
         
         # Pad Material/Customer IDs
-        df['Material'] = df['Material'].apply(normalize_product_id)
-        df['SoldToParty'] = df['SoldToParty'].apply(lambda x: str(x).zfill(10) if pd.notna(x) else x)
+        if 'Material' in df.columns:
+            df['Material'] = df['Material'].apply(normalize_product_id)
+        if 'SoldToParty' in df.columns:
+            df['SoldToParty'] = df['SoldToParty'].apply(lambda x: str(x).zfill(10) if pd.notna(x) else x)
         
-        # Clean numeric columns (Pricing Truth: NetAmount used directly)
-        for col in ['BillingQuantity', 'NetAmount', 'CostAmount', 'GrossMargin']:
+        # Handle Sales Office Nulls (v2.1)
+        if 'SalesOffice' in df.columns:
+            df['SalesOffice'] = df['SalesOffice'].fillna('N/A')
+        if 'SalesOfficeText' in df.columns:
+            df['SalesOfficeText'] = df['SalesOfficeText'].fillna('N/A')
+
+        # Clean numeric columns
+        numeric_cols = [
+            'BillingQuantity', 'NetAmount', 'NetAmountINR', 
+            'CostAmountINR', 'GrossMarginPercentageINR'
+        ]
+        for col in numeric_cols:
             if col in df.columns:
+                if df[col].dtype == object:
+                    df[col] = df[col].astype(str).str.replace(",", "", regex=False)
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         
-        # Currency Normalization (USD to INR @ 93)
-        if 'TransactionCurrency' in df.columns:
-            logger.info("Normalizing Currency: Converting USD to INR (Rate: 93)")
-            mask_usd = df['TransactionCurrency'].str.upper() == 'USD'
-            for col in ['NetAmount', 'CostAmount', 'GrossMargin']:
-                if col in df.columns:
-                    df.loc[mask_usd, col] = df.loc[mask_usd, col] * 93
-            
-            # Standardize label to INR for unified reporting
-            df['TransactionCurrency'] = 'INR'
+        # Bulk insert (REPLACE mode to align with CSV schema automatically)
+        logger.info("Dropping and Recreating table: fact_sales")
+        df.to_sql("fact_sales", engine, if_exists='replace', index=False, chunksize=500)
         
-        # Bulk insert
-        df.to_sql("fact_sales", engine, if_exists='append', index=False, chunksize=1000)
-    
-    # [SALES ONLY MODE] Skipping Inventory, Profitability, Cashflow, and BOM as requested.
+        # 2. Create View (The Semantic Layer)
+        logger.info("Creating view: sales_clean")
+        with engine.begin() as conn:
+            conn.execute(text("""
+                CREATE OR ALTER VIEW sales_clean AS
+                SELECT
+                    BillingDocument          AS bill_doc,
+                    BillingDocumentItem      AS bill_doc_item,
+                    BillingDocumentDate      AS event_date,
+                    Material                 AS product_id,
+                    ProductName              AS product_name,
+                    MaterialGroup            AS material_group,
+                    SoldToParty              AS customer_id,
+                    CustomerName             AS customer_name,
+                    CustomerRegionName       AS region,
+                    BillingQuantity          AS quantity,
+                    BillingQuantityUnit      AS unit,
+                    NetAmountINR             AS revenue,
+                    CostAmountINR            AS cost,
+                    GrossMarginPercentageINR AS margin_pct,
+                    SalesOrganization        AS sales_org_code,
+                    SalesOrganizationText    AS sales_org,
+                    SalesOffice              AS sales_office_code,
+                    SalesOfficeText          AS sales_office,
+                    DistributionChannel      AS channel_code,
+                    DistributionChannelText  AS channel,
+                    Divison                  AS division_code, -- Mapping CSV typo
+                    DivisionText             AS division,
+                    PlantName                AS plant,
+                    PlantCityName            AS plant_city,
+                    BillingDocumentType      AS bill_doc_type,
+                    BillingDocumentTypeText  AS bill_doc_type_text
+                FROM fact_sales;
+            """))
+        logger.info("View sales_clean created successfully.")
+    else:
+        logger.error(f"Sales file NOT FOUND: {f_sales}")
 
 if __name__ == "__main__":
     try:
         engine = get_engine()
         logger.info("Project Phoenix: Initiating Clean-Slate Rebuild...")
         
-        purge_and_create_tables(engine)
+        # We use if_exists='replace' in load_data, so no separate purge needed for fact_sales
         load_data(engine)
         
         logger.info("=" * 60)
