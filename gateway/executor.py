@@ -78,27 +78,36 @@ def _build_query(intent: str, params: dict, domain: str = None) -> tuple[str, di
     Returns (filled_sql_string, safe_params_dict).
     """
     # 1. Try the Registry (New Modular Domain Path)
-    query = registry.get_template(domain, intent) if domain else None
+    template = registry.get_template(domain, intent) if domain else None
     
     # 2. Global Registry Fallback (if domain is unknown)
-    if not query:
+    if not template:
         all_tmpls = registry.get_all_templates()
-        query = all_tmpls.get(intent)
-
-    if query:
-        return query.strip(), params
+        template = all_tmpls.get(intent)
 
     # 3. Legacy Fallback
-    from . import sql_templates
-    if intent in sql_templates.SQL_TEMPLATES:
-        template = sql_templates.SQL_TEMPLATES[intent]
-        return template.strip(), params
+    if not template:
+        from . import sql_templates
+        if intent in sql_templates.SQL_TEMPLATES:
+            template = sql_templates.SQL_TEMPLATES[intent]
 
-    # Final Failure
-    raise ValueError(f"Intent '{intent}' (Domain: {domain}) not recognized in any registered domain.")
+    if not template:
+        raise ValueError(f"Intent '{intent}' (Domain: {domain}) not recognized in any registered domain.")
+
+    # Normalize template to dict if it's a raw string
+    if isinstance(template, str):
+        template = {"query": template, "params": {}, "optional_filters": {}}
 
     # Step 1: Validate types + fuzzy-correct entity names
     safe_params = validators.validate_and_correct_params(intent, params, template)
+    
+    # Inject default data window if missing
+    if "start_date" not in safe_params or "end_date" not in safe_params:
+        window = validators.get_data_window()
+        if "start_date" not in safe_params:
+            safe_params["start_date"] = window.get("min_date", "2025-02-01")
+        if "end_date" not in safe_params:
+            safe_params["end_date"] = window.get("max_date", "2025-02-15")
 
     # Step 2: Build the query string
     query = template["query"]
@@ -146,7 +155,7 @@ def validate_schema():
     
     engine = get_engine()
     column_map = config.get_column_map()
-    table = config.TABLE_SALES
+    table = config.VIEW_SALES
     
     failed_cols = []
     with engine.connect() as conn:

@@ -41,25 +41,45 @@ def load_entity_cache():
 
     try:
         with engine.connect() as conn:
+            # 1. Load entities
             ENTITY_CACHE = {
                 "region": set(
-                    pd.read_sql("SELECT DISTINCT CustomerRegionName FROM fact_sales", conn)["CustomerRegionName"].dropna()
+                    pd.read_sql("SELECT DISTINCT region FROM sales_clean", conn)["region"].dropna()
                 ),
-                "customer": set([]), # Customer names not available in core fact tables yet
+                "customer": set(
+                    pd.read_sql("SELECT DISTINCT customer_name FROM sales_clean", conn)["customer_name"].dropna()
+                ),
                 "product": set(
-                    pd.read_sql("SELECT DISTINCT ProductName FROM fact_sales", conn)["ProductName"].dropna()
+                    pd.read_sql("SELECT DISTINCT product_name FROM sales_clean", conn)["product_name"].dropna()
                 ),
-                "warehouse": set(
-                    pd.read_sql("SELECT DISTINCT location_name FROM fact_inventory", conn)["location_name"].dropna()
+                "plant": set(
+                    pd.read_sql("SELECT DISTINCT plant FROM sales_clean", conn)["plant"].dropna()
                 ),
             }
-        total = sum(len(v) for v in ENTITY_CACHE.values())
-        logger.info("Entity cache loaded: %d entities across %d categories", total, len(ENTITY_CACHE))
+            
+            # 2. Load dynamic data window metadata
+            try:
+                date_row = conn.execute(text("SELECT MIN(event_date), MAX(event_date) FROM sales_clean")).fetchone()
+                min_d = str(date_row[0].date()) if date_row and date_row[0] else "2025-02-01"
+                max_d = str(date_row[1].date()) if date_row and date_row[1] else "2025-02-15"
+                ENTITY_CACHE["metadata"] = {"min_date": min_d, "max_date": max_d}
+            except Exception as metadata_err:
+                logger.error("Failed to load data window: %s", metadata_err)
+                ENTITY_CACHE["metadata"] = {"min_date": "2025-02-01", "max_date": "2025-02-15"}
+                
+        total = sum(len(v) for k, v in ENTITY_CACHE.items() if k != "metadata")
+        logger.info("Entity cache loaded: %d entities across %d categories", total, len(ENTITY_CACHE)-1)
     except Exception as e:
         logger.error("Failed to load entity cache: %s", e)
         ENTITY_CACHE = {}
     finally:
         engine.dispose()
+
+def get_data_window() -> dict:
+    """Returns the start and end dates dynamically retrieved from the DB."""
+    if not ENTITY_CACHE or "metadata" not in ENTITY_CACHE:
+        return {"min_date": "2025-02-01", "max_date": "2025-02-15"}
+    return ENTITY_CACHE["metadata"]
 
 
 def fuzzy_match(value: str, category: str, cutoff: float = 0.75) -> tuple[str, float]:
@@ -97,10 +117,10 @@ def fuzzy_match(value: str, category: str, cutoff: float = 0.75) -> tuple[str, f
 
 # Which params map to which entity category for fuzzy matching
 PARAM_TO_CATEGORY = {
-    "region": "region",
+    "region":   "region",
     "customer": "customer",
-    "product": "product",
-    "warehouse": "warehouse",
+    "product":  "product",
+    "plant":    "plant",
 }
 
 def validate_and_correct_params(intent: str, params: dict, template_config: dict) -> dict:
@@ -163,8 +183,12 @@ def validate_and_constrain_sql(sql: str) -> str:
     # 2. Enforce READ-ONLY (must start with SELECT or WITH)
     if not (sql_upper.startswith("SELECT") or sql_upper.startswith("WITH")):
         raise ValueError("Queries must start with SELECT or WITH.")
+        
+    # 3. Unit Safety for quantity
+    if "QUANTITY" in sql_upper and "UNIT" not in sql_upper:
+        raise ValueError("Query requested 'quantity' without grouping by 'unit'. Mixing units (KG, LTR, etc.) is strictly prohibited.")
 
-    # 3. Strip trailing semicolon
+    # 4. Strip trailing semicolon
     sql = sql.strip().rstrip(";")
     
     return sql
